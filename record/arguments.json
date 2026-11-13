@@ -1,0 +1,11 @@
+{
+ "agent": "agentcore-gateway",
+ "args": {
+  "account": "acct-7781",
+  "amount_minor": 1250,
+  "currency": "USD",
+  "reason": "duplicate charge"
+ },
+ "session": "demo-agent-73267f4f070648afaeed1735558dd0bb",
+ "tool": "payments.refund_send"
+}

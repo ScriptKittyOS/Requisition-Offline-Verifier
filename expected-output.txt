@@ -1,0 +1,50 @@
+######## record/statement.json
+== 1. the binding: these arguments, this act type, this signed record
+  record: requisition.lab.statement.v0 (receipt_hash be1414f11f885ab2de74fb8a0f37c7d923f7e8f9b5438d1fdc8d81c352db164a)
+  act_hash: equal (recomputed 1d175c860a37ab40929be42f3294c9cdf789ff8836976120908e3ef3ea56536d0f144cf922b3f02ed1646483067128f4, signed 1d175c860a37ab40929be42f3294c9cdf789ff8836976120908e3ef3ea56536d0f144cf922b3f02ed1646483067128f4)
+  act_type: equal (recomputed payments.refund_send, signed payments.refund_send)
+  act_hash_alg: equal (recomputed sha384+canonical_payload.v3, signed sha384+canonical_payload.v3)
+  display_digest: equal (recomputed 4c126399dd08cb1d25dfcd6d9e06c1d86a0f94a4e74b04cf9417701c759461e4, signed 4c126399dd08cb1d25dfcd6d9e06c1d86a0f94a4e74b04cf9417701c759461e4)
+== 2. the record: bin/lab-verify, unchanged
+  | the unchanged verify_receipt.py: exit 0 (the Ed25519 signature and the receipt hash check out under key_id 'requisition_lab_kms_ed25519_303190ba-5445-49ec-9d8c-95b804b8c5cf' in the key file given).
+  | the lab checks: kind, labels, key id and act hash bound.
+  | signed verdict: none (a requisition.lab.statement.v0, not a decision)
+  | 
+  | DEGRADED (lab): signed by a lab key the key file given pins as AWS KMS key arn:aws:kms:us-east-2:847072440326:key/303190ba-5445-49ec-9d8c-95b804b8c5cf (signer kms); the signature is checked against that pinned public key; that the private key is held in AWS KMS and never exported is the key file's statement, not checked offline; lab profile, lab key, not a trust root
+  | 
+  | verdict_code: lab_kms_key
+  lab-verify exit 5, verdict_code lab_kms_key
+== 3. the post-quantum co-signature: ML-DSA-87 (FIPS 204) over the same bytes, checked here
+  signed cosign: {"algorithm": "mldsa87", "key_id": "requisition_lab_kms_mldsa87_fd9cf1e7-608c-4f34-b5fe-cdf4cc37620d", "kms_key_arn": "arn:aws:kms:us-east-2:847072440326:key/fd9cf1e7-608c-4f34-b5fe-cdf4cc37620d", "signer": "kms", "status": "signed"}
+  co-signature covers the same bytes: signed_payload and receipt_hash byte-equal
+  ML-DSA-87 signature: valid under requisition_lab_kms_mldsa87_fd9cf1e7-608c-4f34-b5fe-cdf4cc37620d (key fingerprint f28a4da4a0657c6dbc0a1558055ed8992f58dace0478492841ba86342893c71c), pure, empty context, checked by the vendored mldsa 1.0.1 (sha256 0e8885d01ed76919...)
+  both signatures verified: the Ed25519 signature (by bin/lab-verify) and the ML-DSA-87 co-signature (by this tool)
+  post-quantum REQUIRED (--require-pq): met
+verdict: PASS -- the record is bound to these arguments and its Ed25519 signature AND its ML-DSA-87 (post-quantum) co-signature over the same bytes are valid under the LAB key(s) the key file pins as AWS KMS keys arn:aws:kms:us-east-2:847072440326:key/303190ba-5445-49ec-9d8c-95b804b8c5cf, arn:aws:kms:us-east-2:847072440326:key/fd9cf1e7-608c-4f34-b5fe-cdf4cc37620d (lab profile, lab keys, not a trust root; KMS custody is the key file's statement, not checked offline). What it decided is its signed verdict, above.
+
+######## record/decision.json
+== 1. the binding: these arguments, this act type, this signed record
+  record: requisition.lab.decision.v0 (receipt_hash 276f2f8785a119bcd4c647df67c467b38265e10a0fe2f71e47e23ae1b2f5b859)
+  signed verdict: allow
+  act_hash: equal (recomputed 1d175c860a37ab40929be42f3294c9cdf789ff8836976120908e3ef3ea56536d0f144cf922b3f02ed1646483067128f4, signed 1d175c860a37ab40929be42f3294c9cdf789ff8836976120908e3ef3ea56536d0f144cf922b3f02ed1646483067128f4)
+  act_type: equal (recomputed payments.refund_send, signed payments.refund_send)
+  act_hash_alg: equal (recomputed sha384+canonical_payload.v3, signed sha384+canonical_payload.v3)
+  display_projection_digest: equal (recomputed 4c126399dd08cb1d25dfcd6d9e06c1d86a0f94a4e74b04cf9417701c759461e4, signed 4c126399dd08cb1d25dfcd6d9e06c1d86a0f94a4e74b04cf9417701c759461e4)
+== 2. the record: bin/lab-verify, unchanged
+  | the unchanged verify_receipt.py: exit 0 (the Ed25519 signature and the receipt hash check out under key_id 'requisition_lab_kms_ed25519_303190ba-5445-49ec-9d8c-95b804b8c5cf' in the key file given).
+  | the lab checks: kind, labels, key id and act hash bound.
+  | signed verdict: allow (the record's own; the exit code does not tell an allow from a deny)
+  | 
+  | DEGRADED (lab): signed by a lab key the key file given pins as AWS KMS key arn:aws:kms:us-east-2:847072440326:key/303190ba-5445-49ec-9d8c-95b804b8c5cf (signer kms); the signature is checked against that pinned public key; that the private key is held in AWS KMS and never exported is the key file's statement, not checked offline; lab profile, lab key, not a trust root
+  | 
+  | verdict_code: lab_kms_key
+  lab-verify exit 5, verdict_code lab_kms_key
+== 3. the post-quantum co-signature: ML-DSA-87 (FIPS 204) over the same bytes, checked here
+  signed cosign: {"algorithm": "mldsa87", "key_id": "requisition_lab_kms_mldsa87_fd9cf1e7-608c-4f34-b5fe-cdf4cc37620d", "kms_key_arn": "arn:aws:kms:us-east-2:847072440326:key/fd9cf1e7-608c-4f34-b5fe-cdf4cc37620d", "signer": "kms", "status": "signed"}
+  co-signature covers the same bytes: signed_payload and receipt_hash byte-equal
+  ML-DSA-87 signature: valid under requisition_lab_kms_mldsa87_fd9cf1e7-608c-4f34-b5fe-cdf4cc37620d (key fingerprint f28a4da4a0657c6dbc0a1558055ed8992f58dace0478492841ba86342893c71c), pure, empty context, checked by the vendored mldsa 1.0.1 (sha256 0e8885d01ed76919...)
+  both signatures verified: the Ed25519 signature (by bin/lab-verify) and the ML-DSA-87 co-signature (by this tool)
+  post-quantum REQUIRED (--require-pq): met
+verdict: PASS -- the record is bound to these arguments and its Ed25519 signature AND its ML-DSA-87 (post-quantum) co-signature over the same bytes are valid under the LAB key(s) the key file pins as AWS KMS keys arn:aws:kms:us-east-2:847072440326:key/303190ba-5445-49ec-9d8c-95b804b8c5cf, arn:aws:kms:us-east-2:847072440326:key/fd9cf1e7-608c-4f34-b5fe-cdf4cc37620d (lab profile, lab keys, not a trust root; KMS custody is the key file's statement, not checked offline). What it decided is its signed verdict, above.
+
+RESULT: PASS (both records verify)
