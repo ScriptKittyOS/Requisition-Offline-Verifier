@@ -50,6 +50,30 @@ that path was changed. Nothing else differs. The complete difference from the so
 Because the source files are unchanged, their comments and some output lines use the source trees' paths
 (`bin/lab-verify`, `bin/vendor/mldsa.py`) and the project's internal reference numbers (`G-…`, `REQ-…`).
 
+## The interoperability folder (`interop/`)
+
+Added after v0.1.0. Written for this repository: `interop/README.md`, `interop/build-cases.py`, `interop/run-all.sh`,
+`interop/cases.tsv` (derived by `build-cases.py` from `record/` and `interop/vectors/`; SHA-256
+`be385c339c765ead8dfd68645d5116b873c806f6002e6a8df8fd6ed4e94a3f96`), and everything under `interop/verifiers/`.
+The harnesses call the libraries they test and contain no copy of them.
+
+The test vectors are third-party files. Their sources, pinned commits and licences are in
+`interop/vectors/PROVENANCE.md`.
+
+| File | Source | SHA-256 | Changes |
+|---|---|---|---|
+| `interop/vectors/acvp_sigver_mldsa87_pure_external.json` | NIST ACVP-Server v1.1.0.43, ML-DSA-sigVer-FIPS204 | `768460682c2d81e101eeeefac12a0cfdb5d4712e0f718c2212bcfdf0a4a90522` | a subset of the upstream file, as described in `interop/vectors/PROVENANCE.md` |
+| `interop/vectors/wycheproof_mldsa_87_verify_test.json` | C2SP Wycheproof, `testvectors_v1/mldsa_87_verify_test.json` | `54adffe10f6dad7941ffd97f77ad4e5c85cb3a54d44cf5ce1c95cb1757b9ba14` | none |
+| `interop/vectors/LICENSE.nist-acvp-server` | NIST ACVP-Server | `7d1308ff19c82f712268ec64951db2fa0ed04b7ec6158b449842210ad79e3d85` | none |
+| `interop/vectors/LICENSE.wycheproof` | C2SP Wycheproof | `58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd` | none |
+
+`interop/vectors/PROVENANCE.md` is the provenance note of the vector files; two of its lines that referred to files
+outside this repository were reworded for this repository.
+
+No file from v0.1.0 changed except `README.md` (an `interop/` entry in the file list, a section "Other verifiers", a
+licence line for the vectors, and the description of Requisition worded as "an authority of record"), this file,
+and `SHA256SUMS`.
+
 ## How this copy was checked before publication
 
 - `sh verify.sh` passes on Python 3.11.15 and 3.12.3, in an empty environment (`env -i`), with identical output.

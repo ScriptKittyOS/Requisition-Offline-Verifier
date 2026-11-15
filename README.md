@@ -2,7 +2,7 @@
 
 This repository holds one signed approval record and the program that verifies it. Anyone can run the verification on their own machine, offline, with one command.
 
-The record comes from a run on 13 November 2026 in which an AI agent asked to send a refund. [Requisition](#about-requisition), a control plane for agent actions, held the request until two approvers had approved it, then signed its decision. Each signed record carries two signatures over the same bytes, both made inside AWS KMS:
+The record comes from a run on 13 November 2026 in which an AI agent asked to send a refund. [Requisition](#about-requisition), an authority of record for agent actions, held the request until two approvers had approved it, then signed its decision. Each signed record carries two signatures over the same bytes, both made inside AWS KMS:
 
 - **Ed25519** (RFC 8032), and
 - **ML-DSA-87** (FIPS 204), the post-quantum signature standard.
@@ -150,6 +150,13 @@ verifier/
   lab-verify           checks the record's kind, labels and key entry; runs verify_receipt.py
   verify_receipt.py    checks the Ed25519 signature and the record hash
   vendor/mldsa.py      third-party ML-DSA (FIPS 204) verification, unmodified
+interop/
+  README.md            what was measured with nine ML-DSA-87 verifiers, and what it does not show
+  cases.tsv            260 cases built from the record and two sets of test vectors
+  build-cases.py       derives cases.tsv; --check compares it with the committed file
+  run-all.sh           runs every verifier it finds
+  verifiers/           one folder per verifier: the harness and how to build and run it
+  vectors/             the two test-vector files, their provenance and licences
 PROVENANCE.md          where every file came from, with digests
 SHA256SUMS             SHA-256 of every file
 LICENSE                Requisition-Offline-Verifier Verification Licence 1.0
@@ -159,9 +166,13 @@ The verifier uses the Python standard library and one vendored file, [`verifier/
 
 Tested with Python 3.11.15 and 3.12.3 on Linux. A system-call trace of `verify.sh` shows no network calls.
 
+## Other verifiers
+
+`verify.sh` checks the ML-DSA-87 signatures with one library, mldsa-py. The folder [`interop/`](interop/README.md) holds a case file built from this record and from two sets of public test vectors, and a harness for each of nine ML-DSA-87 verifiers: mldsa-py, pyca/cryptography, Erlang/OTP `crypto`, @noble/post-quantum, Go `crypto/mldsa`, Bouncy Castle, AWS-LC, wolfSSL and Botan. On 14 November 2026 each reported no disagreement with the expected result on the cases it ran. [`interop/README.md`](interop/README.md) gives the versions, the commands to repeat the runs, which of these libraries share code, and what the runs do not show.
+
 ## About Requisition
 
-Requisition is a control plane for what AI agents and other automated actors are allowed to do. A consequential action is held until the people who must approve it have approved it, and every decision is recorded in a form that a third party can verify without access to the system that produced it. This repository shows that last property.
+Requisition is an authority of record for what AI agents and other automated actors are allowed to do. A consequential action is held until the people who must approve it have approved it, and every decision is recorded in a form that a third party can verify without access to the system that produced it. This repository shows that last property.
 
 An approval record for a consequential action may need to be relied on for many years. A record whose signature could be forged later is a record that could be rewritten later, which is the reason for the second, post-quantum signature.
 
@@ -172,6 +183,8 @@ The Requisition server is not open source. This verifier and these records are p
 [Requisition-Offline-Verifier Verification Licence 1.0](LICENSE). In short: you may read everything here, run the verifier and the negative tests, run the unmodified verifier on other Requisition records, and publish what you find. Redistribution, modified versions, building the materials into a product, and training a model on them need written permission. The licence text governs; this summary does not.
 
 The vendored ML-DSA library keeps its own licence: [`verifier/vendor/LICENSE.mldsa`](verifier/vendor/LICENSE.mldsa).
+
+The test vectors in `interop/vectors/` keep their own licences: [`LICENSE.nist-acvp-server`](interop/vectors/LICENSE.nist-acvp-server) for the NIST ACVP file and [`LICENSE.wycheproof`](interop/vectors/LICENSE.wycheproof) for the Wycheproof file.
 
 Releases are tagged and signed. `git verify-tag v0.1.0` checks the signature; the licence gives the key fingerprint.
 
