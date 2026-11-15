@@ -51,17 +51,20 @@ int main(int argc, char **argv) {
   if (wolfCrypt_Init() != 0) return 2;
   FILE *f = fopen(argv[1], "r");
   if (!f) { fprintf(stderr, "cannot read %s\n", argv[1]); return 2; }
-  size_t cap = 1 << 20;
-  char *line = malloc(cap);
+  size_t cap = 0;
+  char *line = NULL;
+  ssize_t len;
   int n = 0, nbad = 0;
   char bad[8192] = "";
-  while (fgets(line, (int)cap, f)) {
-    line[strcspn(line, "\r\n")] = 0;
-    if (!*line) continue;
-    char *fld[6];
+  while ((len = getline(&line, &cap, f)) != -1) {
+    if (len > 0 && line[len - 1] == '\n') line[--len] = 0;
+    if (len == 0) continue;
+    if (len > 0 && line[len - 1] == '\r') line[--len] = 0;
+    if ((size_t)len != strlen(line) || strchr(line, '\r')) { fprintf(stderr, "bad line\n"); return 2; }
+    char *fld[7];
     int k = 0;
     char *p = line;
-    while (k < 6) { fld[k++] = p; char *t = strchr(p, '\t'); if (!t) break; *t = 0; p = t + 1; }
+    while (k < 7) { fld[k++] = p; char *t = strchr(p, '\t'); if (!t) break; *t = 0; p = t + 1; }
     if (k != 6) { fprintf(stderr, "bad line\n"); return 2; }
     size_t pkl, sl, ml, cl;
     unsigned char *pk = unhex(fld[1], &pkl), *sig = unhex(fld[2], &sl);

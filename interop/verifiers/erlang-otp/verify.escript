@@ -11,6 +11,7 @@ main([Cases]) ->
         false -> io:format(standard_error, "this Erlang/OTP :crypto has no mldsa87 (~s)~n", [element(3, hd(crypto:info_lib()))]), halt(3)
     end;
 main(_) ->
+    io:format(standard_error, "usage: verify.escript CASES.tsv~n", []),
     halt(2).
 
 run(Cases) ->

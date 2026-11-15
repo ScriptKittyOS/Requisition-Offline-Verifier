@@ -40,6 +40,8 @@ wolfSSL 5.9.4: 260 cases, 0 disagree with the expected result []
 0 when no case disagrees with its expected result; 1 when at least one does (the result line names the case ids);
 2 when the run is not valid and no result line is printed: a wrong number of arguments, a cases file that cannot be
 read, a line that is not six tab-separated fields, a field that is not hex (or `-`), an expected result other than 0 or 1,
-or a cases file with no case in it. Only a case that was parsed and given to the library can agree or disagree.
+or a cases file with no case in it. Only a case that was parsed can agree or disagree; the 5 cases with a context
+over 255 bytes are refused by the harness itself (see Limit above).
 A line of `interop/cases.tsv` has six tab-separated fields: case id, public key, signature, message, context, expected
 result (1 or 0), in lower-case hex with `-` for empty.
+A line with no characters is skipped; a line of only spaces or tabs is not, and ends the run with exit 2.

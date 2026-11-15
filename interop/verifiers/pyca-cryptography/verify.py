@@ -11,6 +11,7 @@ from cryptography.hazmat.backends.openssl.backend import backend
 from cryptography.hazmat.primitives.asymmetric import mldsa
 
 if len(sys.argv) != 2:
+    print("usage: verify.py CASES.tsv", file=sys.stderr)
     sys.exit(2)
 
 
@@ -33,7 +34,7 @@ def unhex(s):
 
 n, wrong = 0, []
 try:
-    rows = open(sys.argv[1]).read().split("\n")
+    rows = open(sys.argv[1], newline="").read().split("\n")
 except (OSError, UnicodeDecodeError) as e:
     print("cannot read %s" % sys.argv[1], file=sys.stderr)
     sys.exit(2)

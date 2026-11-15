@@ -75,6 +75,9 @@ results on these cases when run as described.
   versions were not run.
 - The 260 cases are all tests of verification. Signing, other parameter sets, pre-hashed signatures and the
   external-mu interface were not run.
+- A case line ends at a line feed. A carriage return before it was accepted by six harnesses (mldsa-py, pyca/cryptography,
+  Go, Bouncy Castle, AWS-LC, wolfSSL) and refused with exit 2 by three (Erlang/OTP, @noble/post-quantum, Botan);
+  a carriage return followed by more text on the same line, or used alone as a line separator, was refused by all nine.
 - The harnesses were written for this folder. They are short, and they are included so you can read them.
 - Agreement on these cases is not a proof that a library is correct on other inputs.
 

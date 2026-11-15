@@ -28,9 +28,11 @@ public class BcVerify {
   public static void main(String[] a) throws Exception {
     if (a.length != 1) { System.err.println("usage: BcVerify.java CASES.tsv"); System.exit(2); }
     List<String> lines = null;
-    try { lines = Files.readAllLines(Paths.get(a[0])); } catch (Exception e) { System.err.println("cannot read " + a[0]); System.exit(2); }
+    try { lines = Arrays.asList(new String(Files.readAllBytes(Paths.get(a[0])), java.nio.charset.StandardCharsets.UTF_8).split("\n", -1)); } catch (Exception e) { System.err.println("cannot read " + a[0]); System.exit(2); }
     int n = 0; List<String> wrong = new ArrayList<>();
     for (String line : lines) {
+      if (line.isEmpty()) continue;
+      if (line.endsWith("\r")) line = line.substring(0, line.length() - 1);
       String[] p = line.split("\t", -1);
       if (p.length != 6) { System.err.println("bad line"); System.exit(2); }
       if (!p[5].equals("0") && !p[5].equals("1")) { System.err.println("bad expected result in case " + p[0]); System.exit(2); }

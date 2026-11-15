@@ -28,3 +28,4 @@ printed (a wrong number of arguments, a cases file that cannot be read, a line t
 field that is not hex (or `-`), an expected result other than 0 or 1, or no case run), 3 when this Erlang has no
 ML-DSA-87. A line of `interop/cases.tsv` has six tab-separated fields: case id, public key, signature, message,
 context, expected result (1 or 0), in lower-case hex with `-` for empty.
+A line with no characters is skipped; a line of only spaces or tabs is not, and ends the run with exit 2.

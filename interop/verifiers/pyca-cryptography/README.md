@@ -28,3 +28,4 @@ read, a line that is not six tab-separated fields, a field that is not hex (or `
 or a cases file with no case in it. Only a case that was parsed and given to the library can agree or disagree.
 A line of `interop/cases.tsv` has six tab-separated fields: case id, public key, signature, message, context, expected
 result (1 or 0), in lower-case hex with `-` for empty.
+A line with no characters is skipped; a line of only spaces or tabs is not, and ends the run with exit 2.

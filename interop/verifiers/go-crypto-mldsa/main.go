@@ -5,6 +5,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/mldsa"
 	"encoding/hex"
 	"fmt"
@@ -45,9 +46,25 @@ func main() {
 	}
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 1<<20), 1<<26)
+	// split at "\n" only, so that a lone carriage return is not a line end
+	sc.Split(func(data []byte, atEOF bool) (int, []byte, error) {
+		if atEOF && len(data) == 0 {
+			return 0, nil, nil
+		}
+		if i := bytes.IndexByte(data, '\n'); i >= 0 {
+			return i + 1, data[:i], nil
+		}
+		if atEOF {
+			return len(data), data, nil
+		}
+		return 0, nil, nil
+	})
 	n, wrong := 0, []string{}
 	for sc.Scan() {
-		p := strings.Split(sc.Text(), "\t")
+		if sc.Text() == "" {
+			continue
+		}
+		p := strings.Split(strings.TrimSuffix(sc.Text(), "\r"), "\t")
 		if len(p) != 6 {
 			fmt.Fprintln(os.Stderr, "bad line")
 			os.Exit(2)
