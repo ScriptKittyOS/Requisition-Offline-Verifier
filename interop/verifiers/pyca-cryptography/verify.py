@@ -41,7 +41,7 @@ except (OSError, UnicodeDecodeError) as e:
 for row in rows:
     if not row:
         continue
-    fields = row.rstrip("\r").split("\t")
+    fields = (row[:-1] if row.endswith("\r") else row).split("\t")
     if len(fields) != 6:
         print("bad line", file=sys.stderr)
         sys.exit(2)
