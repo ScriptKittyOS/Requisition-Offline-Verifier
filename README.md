@@ -77,7 +77,7 @@ The verifier reads three inputs and nothing else: the record, the arguments, and
 
 ### About `DEGRADED (lab)` in the output
 
-The Ed25519 check prints `DEGRADED (lab)` and exits with code 5 for every record signed under the evaluation key profile, including a valid one. That is deliberate: this tool does not report full trust for a key that is not anchored in a trust root. The outer verifier expects exactly that answer for this profile and reports `verdict: PASS` only when all three checks hold.
+The Ed25519 check prints `DEGRADED (lab)` and exits with code 5 for both records here, although both are valid. That is deliberate: this tool does not report full trust for a key that is not anchored in a trust root. The outer verifier expects exactly that answer for this profile and reports `verdict: PASS` only when all three checks hold.
 
 ## What a pass proves, and what it does not
 

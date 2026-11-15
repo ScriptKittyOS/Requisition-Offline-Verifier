@@ -9,9 +9,10 @@ under "statement". LAB-KEYS.json is the lab key file (mix requisition.lab.keygen
 /v1/keys serves it). HEX is the act hash the checker expects the record to be bound to.
 
 WHAT A LAB RECORD IS, AND WHY THIS NEVER SAYS "VERIFIED". A lab record is a legacy agent_receipt.v1
-receipt signed by a DEV key held in the app's environment (REQ-171 L0, the publisher Decision
-11e17a20). The best it can be is DEGRADED (lab): one dev key, legacy format, not a trust root. So a
-record that passes every check here exits 5, never 0, and the unchanged verifier's exit 0 is never
+receipt signed by a lab key: a DEV key held in the app's environment, or a lab KMS key (K1, below)
+(REQ-171 L0, the publisher Decision 11e17a20). The best it can be is DEGRADED (lab): a lab key, legacy
+format, not a trust root. So a record that passes every check here exits 5 (on the Ed25519 path a CEASE
+record, which authorises nothing, exits 0: see EXIT CODES), and the unchanged verifier's exit 0 is never
 quoted without this verdict (the plan's "What must not be claimed").
 
 THE TWO PATHS, chosen by the lab key file's entry for the record's key_id (its "algorithm"; an entry
@@ -23,9 +24,9 @@ without one, or with any other value, is refused: default deny):
     verdict of its other than exit 0 is passed through UNCHANGED, its exit and its words, so its
     codes stay its own (registry_missing_key for a production record checked against the lab key
     file, L0-D7). On its exit 0 the lab checks below run, and a record that passes them exits 5
-    lab_dev_key.
-  * mldsa87 -- verify_receipt.py is NOT run: it checks Ed25519 only, by its own rule (G-212,
-    verify_receipt.py:36-42), and requires a 32-byte key (:340). Python's standard library has no
+    lab_dev_key, or lab_kms_key when a lab KMS key signed it (a CEASE record: exit 0).
+  * mldsa87 -- verify_receipt.py is NOT run: it checks Ed25519 only, by its own rule (G-212; its
+    THE RULE THIS FILE BOUNDS), and requires a 32-byte key. Python's standard library has no
     ML-DSA, so this file checks the record's bytes, binding and labels and the key entry's own
     integrity, never the signature, and exits 5 lab_signature_unchecked_mldsa87, saying so. The
     signature is checked by mix requisition.lab.verify_mldsa87 ENVELOPE --keys LAB-KEYS.json (Erlang
@@ -34,40 +35,42 @@ without one, or with any other value, is refused: default deny):
 A record whose key_id the key file does not name, or names twice, goes to the unchanged verifier
 on either path: those are its trust questions, answered in its words.
 
-THE KEY RULE (2026-11-11 crypto review, W1-1 and W1-4). One rule for when a key may sign, in every verifier
+THE KEY RULE (2026-11-11 crypto review, W1-1 and W1-4). One rule for when a key may sign
 (lib/autonomous_agency/authority/execute_api/lab_key_rule.ex is its text; lab/requisition_key_rule_vectors.v1.json
-its vectors, run against this file and the others): a key is refused if it is compromised or revoked (key_revoked),
-if its status is not active or retired (key_status_unusable), if its window is unreadable, if the record's signed
-occurred_at is unreadable, or if occurred_at is outside valid_from <= occurred_at < valid_to (key_not_valid_at_signing);
-a retired key verifies exactly its own window. This file applies the rule ITSELF, once (apply_key_rule), on both
-paths and BEFORE the unedited verify_receipt.py, which does not know a signer, treats a retired key with no valid_to as
-open-ended and accepts an instant with a trailing newline (lab_key_revoked, lab_key_status_not_active,
-lab_key_window_unreadable, lab_signed_instant_unreadable, lab_key_not_valid_at_signing, lab_signer_not_accepted; exit 5,
-a trust refusal); what the rule passes the reference then judges in its own words and codes. A record signed by a key whose status
-is "compromised" is therefore refused lab_key_revoked (exit 5) here, no longer passed through as the reference's exit 6.
+its vectors, run against this file by test/autonomous_agency_web/v1/lab_verify_key_rule_test.exs): a key is refused
+if it is compromised or revoked (key_revoked), if its status is not active or retired (key_status_unusable), if its
+window is unreadable, if the record's signed occurred_at is unreadable, or if occurred_at is outside
+valid_from <= occurred_at < valid_to (key_not_valid_at_signing); a retired key verifies exactly its own window.
+This file applies the rule ITSELF, once (apply_key_rule), on both paths and BEFORE the unedited verify_receipt.py,
+which does not know a signer and treats a retired key with no valid_to as open-ended (lab_key_revoked,
+lab_key_status_not_active, lab_key_window_unreadable, lab_signed_instant_unreadable, lab_key_not_valid_at_signing,
+lab_signer_not_accepted; exit 5, a trust refusal); on the Ed25519 path, what the rule passes verify_receipt.py then
+judges in its own words and codes. A record signed by a key whose status is "compromised" is therefore refused
+lab_key_revoked (exit 5) here, where verify_receipt.py alone answers exit 6. A signed payload this file does not
+read as a JSON object gets no key rule; it never passes (checks 4 and 5), and on the Ed25519 path an
+answer of verify_receipt.py other than exit 0 is passed through, exit 6 included.
 --accept-signer LABEL (repeatable, never empty: an empty accepted-signers set is a configuration error) is the relying
 party's policy: a record whose key file entry's signer is not one of the labels is refused lab_signer_not_accepted.
-Without it any signer verifies, as before: --accept-signer kms makes KMS custody bound what verifies (the dev
+Without it any signer verifies: --accept-signer kms makes KMS custody bound what verifies (the dev
 keys are exportable). The inputs are read STRICTLY (W1-6): a duplicated member, NaN/Infinity, a number outside the
 double range, a byte-order mark, bytes that are not UTF-8, nesting deeper than 64 containers or an integer outside
-+-(2^53-1) are refused (exit 2); the released verifier, which reads
-leniently, is only ever handed bytes this file has already read strictly.
++-(2^53-1) are refused (exit 2); verify_receipt.py is handed only bytes this file has already read.
 
 CO-SIGNATURES (G-627). This file checks the Ed25519 signature only. A record that carries an ML-DSA-87
 co-signature (a "cosignature" member beside the envelope) or announces one (signed metadata.cosign.status
-"signed") is said so on every verdict that passes: "co-signature present, NOT checked by this tool (use
-verify_offline --require-pq)". The exit code is unchanged. A caller that checks the co-signature itself (verify_offline.py)
+"signed") is said so on every verdict that passes on the Ed25519 path: "co-signature present, NOT checked by this
+tool (use verify_offline --require-pq)". The exit code is unchanged. A caller that checks the co-signature itself (verify_offline.py)
 passes --cosignature-checked-by-caller and the line is not printed: it would sit inside that caller's PASS, which did check it.
 
 THE CHECKS, in order (an accusation needs standing, so it waits until the key file names the key):
   1. the inputs: two readable JSON files, the envelope's four fields strings, an act hash given;
   2. the key file's entry for the key_id, exactly one (else the verifier, above), its algorithm;
   3. receipt_hash is the SHA-256 of signed_payload, compared here before anything else accuses the
-     record: the unchanged verifier reads the signed occurred_at first (verify_receipt.py:378-387
-     before :394-404), so a one-byte change that breaks the JSON or the instant reaches it as a
-     trust refusal (exit 5), and every one-byte change must exit 1 (L0-D2, L0-M12);
-  4. the path's own check: the verifier (ed25519), or the entry's status, fingerprint, key length and
-     the signature's form (mldsa87);
+     record: the unchanged verifier reads the signed occurred_at first, so a one-byte change that
+     breaks the JSON or the instant reaches it as a trust refusal (exit 5), and every one-byte change
+     of signed_payload must exit 1 (L0-D2, L0-M12);
+  4. THE KEY RULE (above), then the path's own check: the Ed25519 key material and the verifier
+     (ed25519), or the entry's fingerprint, key length and the signature's form (mldsa87);
   5. the signed payload is a JSON object whose receipt_type is a lab kind (requisition.lab.), or an
      effector allow's (REQ-189 R4-3: receipt_type the act type, subject_type effector, signed
      metadata.record_kind requisition.lab.decision.v0);
@@ -79,25 +82,38 @@ THE CHECKS, in order (an accusation needs standing, so it waits until the key fi
      file's entry says signer kms, the key id is KMS_KEY_ID_PREFIX[the entry's algorithm] + a
      resource id (LabKms.key_id_prefixes/0; a pin compares the two), and the signed
      metadata.kms_key_arn is a KMS key ARN ending in key/<that resource id>;
-  8. the signed metadata.act_hash equals --act-hash, byte for byte (L0-D2): only a statement or a
-     decision binds an act, so a registration or grant record is refused here.
+  8. the act hash the record binds equals --act-hash, byte for byte (L0-D2): the signed metadata.act_hash;
+     for an effector record without one, the signed payload_hash; for a CEASE (verdict in CEASE_VERDICTS), the
+     signed metadata.display_digest. A record that is no CEASE and binds none is refused here
+     (lab_act_hash_absent);
+  9. the signed metadata.act_hash_alg is present and is one of ACT_HASH_ALGS (Lane 2a; fix round 1, F2). A record bound
+     under a label this file does not know is refused lab_act_hash_alg_unknown, and a record with NO act_hash_alg member
+     is refused lab_act_hash_alg_absent: every producer of a record that binds an act writes the member, so a record
+     without it is not a server record and says nothing about how its hash was made. A CEASE carries no such member; it
+     returns at check 8 before this check, by name, not by falling through. This file takes --act-hash as given and
+     never derives one (verify_offline.py does, under sha384+canonical_payload.v3 only), so a known label is all it
+     can check.
 
 A RECORD SIGNED BY A LAB KMS KEY (K1) is checked exactly as above on its path. A record that passes
 is still DEGRADED (lab) and exits 5: on the Ed25519 path with verdict_code lab_kms_key (the
-record's signed signer is kms; lab_dev_key is a signer-dev record's only, review 2026-11-10 item 8),
+record's signed signer is kms; lab_dev_key is a signer-dev record's only, review 2026-11-10 item 8;
+a CEASE exits 0 there, lab_recorded_no_authority, as for a dev key),
 on the ML-DSA-87 path with lab_signature_unchecked_mldsa87 as for any record there. The message says
 ONLY what this file can establish offline (review item 2): the record was signed by a lab key the
 key file given pins as AWS KMS key <kms_key_arn> (signer kms), its signature checked against that
 pinned public key (on the ML-DSA-87 path: by mix requisition.lab.verify_mldsa87, not here); that
 the private key is held in AWS KMS and never exported is the key file's statement, not checked.
 
-EXIT CODES (unchanged by the key rule, the signer policy and the co-signature note): 0 (a CEASE record that passed: RECORDED (no authority), lab_recorded_no_authority; REQ-189
-R2-4), 5 (a lab record that passed: lab_dev_key, lab_kms_key or lab_signature_unchecked_mldsa87; or a trust
-refusal: the verifier's, or lab_key_* / lab_signed_instant_unreadable on the ML-DSA-87 path (THE KEY RULE), or lab_signer_not_accepted
-(--accept-signer), or lab_verifier_unavailable), 1 (a
-refusal of the record or of an entry without an algorithm: every lab_ code below), 2 (usage),
-and whatever else the unchanged verifier answered, passed through (1, 2 or 5). Every verdict
-ends with one line "verdict_code: <code>". Codes of this file are its own, each lab_-prefixed,
+EXIT CODES: 0 (on the Ed25519 path, a CEASE record that passed: RECORDED (no authority),
+lab_recorded_no_authority; REQ-189 R2-4), 5 (a lab record that passed: lab_dev_key, lab_kms_key or
+lab_signature_unchecked_mldsa87; or a trust refusal: the verifier's; on either path lab_key_revoked,
+lab_key_status_not_active, lab_key_window_unreadable, lab_signed_instant_unreadable, lab_key_not_valid_at_signing
+(THE KEY RULE) or lab_signer_not_accepted (--accept-signer); lab_key_not_prime_order (the Ed25519 key material);
+lab_key_fingerprint_mismatch or lab_key_public_key_malformed (the ML-DSA-87 entry); or lab_verifier_unavailable),
+1 (a refusal of the record, or of an entry whose algorithm is absent or not known: every other lab_ code), 2 (usage),
+and whatever else the unchanged verifier answered, passed through (1, 2, 5 or 6). Every exit-0, exit-1 and exit-5
+answer of this file, and every exit-1 or exit-5 verdict of the verifier, ends with one line
+"verdict_code: <code>". Codes of this file are its own, each lab_-prefixed,
 sharing no spelling with the verifier's, a step-0 code or a DenialTaxonomy code (L0-A3).
 
 STANDARD LIBRARY ONLY, AND THE IMPORT LIST BELOW IS THE WHOLE OF WHAT THIS FILE MAY REACH; a test
@@ -114,8 +130,8 @@ import sys
 import tempfile
 
 EXIT_LAB, EXIT_REFUSED, EXIT_USAGE = 5, 1, 2
-# REQ-189 (R2-4, D5): a CEASE record that passed: it authorises nothing, so there is no trust to
-# decline, and the answer is RECORDED (no authority) with exit 0 (the reds' R189-D5)
+# REQ-189 (R2-4, D5): a CEASE record that passed on the Ed25519 path: it authorises nothing, so there
+# is no trust to decline, and the answer is RECORDED (no authority) with exit 0 (the reds' R189-D5)
 EXIT_RECORDED = 0
 
 # The unchanged verifier, at its place in this tree, found from this file's own path.
@@ -130,7 +146,8 @@ DEV_KEY_IDS = {
     "mldsa87": "requisition_lab_dev_mldsa87_v0",
 }
 
-# The labels every lab record's signed metadata carries (LabRecords.labels/0; pinned beside the ids).
+# The labels a dev-signed lab record's signed metadata carries (LabRecords.labels/0; pinned beside the ids); a record a
+# lab KMS key signed carries signer kms in place of dev (check_lab_record).
 LABELS = {
     "profile": "lab",
     "signer": "dev",
@@ -146,6 +163,19 @@ KMS_KEY_ID_PREFIX = {
     "mldsa87": "requisition_lab_kms_mldsa87_",
 }
 KMS_SIGNER = "kms"
+
+# Vocabulary.act_hash_algs/0 (lib/autonomous_agency/authority/execute_api/vocabulary.ex): the labels an act hash may
+# be bound under. A named second copy: lab_verify_pins_test.exs fails when the two differ.
+ACT_HASH_ALGS = (
+    "sha256+rfc8785-v1",
+    "sha256+requisition-canonical-v3",
+    "sha384+canonical_payload.v3",
+)
+
+# The signed verdicts of the record kinds that carry NO act_hash_alg member: the CLOSED list (fix round 1, F2). A CEASE
+# (Effector's @recorded) binds its display's digest and no act hash, so it has no label to check and is handled by its own
+# branch in check_lab_record; every other record that reaches the label check must carry one.
+CEASE_VERDICTS = ("recorded_no_authority",)
 
 LAB_KIND_PREFIX = "requisition.lab."
 # REQ-189 (R4-3): an ARM or ENGAGE allow carries the act type in receipt_type, as the box requires,
@@ -263,7 +293,8 @@ def key_standing(entry, occurred_at, accept_signers=None):
         return "signed_instant_unreadable"
     if occurred_at < valid_from or (valid_to is not None and occurred_at >= valid_to):
         return "key_not_valid_at_signing"
-    if accept_signers is not None and entry.get("signer") not in accept_signers:
+    signer = entry.get("signer")  # a list or an object is no label: it is not accepted, and no set is asked for it
+    if accept_signers is not None and (isinstance(signer, (list, dict)) or signer not in accept_signers):
         return "signer_not_accepted"
     return None
 
@@ -326,8 +357,9 @@ def ed25519_key_acceptable(raw: bytes) -> bool:
 
 
 def ed25519_signature_canonical(signature: bytes) -> bool:
-    """64 bytes, R a canonical point encoding (the same strict decode as a key) and S < L: the one signature encoding
-    every verifier accepts (the frozen verifier alone accepts a non-canonical R)."""
+    """64 bytes, R a canonical point encoding (the same strict decode as a key) and S < L. Every verifier in this
+    repository refuses a signature that fails this rule. The Python verifier of the published receipt-verification
+    release r4 (verify_receipt.py) predates the rule (2026-11-13) and accepts a non-canonical R."""
     if not isinstance(signature, (bytes, bytearray)) or len(signature) != 64:
         return False
     return _decode_canonical_point(bytes(signature[:32])) is not None and int.from_bytes(signature[32:], "little") < _L
@@ -428,7 +460,8 @@ def run_verifier(receipt_bytes, registry_bytes):
 
 
 def pass_through(rc, out, err):
-    """The unchanged verifier refused: its exit and its words, nothing of this file's after them."""
+    """The unchanged verifier refused: its exit and its words, nothing of this file's after them, except for an exit
+    the verifier does not define (lab_verifier_unavailable)."""
     sys.stdout.write(
         "bin/lab-verify: the unchanged verify_receipt.py answered exit %d; its verdict is passed "
         "through unchanged.\n" % rc
@@ -447,13 +480,14 @@ def pass_through(rc, out, err):
 
 
 def apply_key_rule(entry, key_id, payload, accept):
-    """THE KEY RULE, once, for both paths and BEFORE the unedited reference verifier (F-2): a retired key without an
-    end, an instant with a trailing newline or a signer outside --accept-signer are refused here, whatever the
-    reference would say."""
+    """THE KEY RULE, once, for both paths and BEFORE the unedited verify_receipt.py (F-2): a retired key without an
+    end, an instant with a trailing newline or a signer outside --accept-signer are refused here, whatever
+    verify_receipt.py would say."""
     try:
         signed = loads_strict(payload)
     except ValueError:
-        return  # an unreadable payload is refused below, check_lab_record's own code
+        # no key rule for a payload this file does not read; it never passes (checks 4 and 5 of the module docstring)
+        return
     if not isinstance(signed, dict):
         return
     reason = key_standing(entry, signed.get("occurred_at"), accept)
@@ -481,9 +515,9 @@ def apply_key_rule(entry, key_id, payload, accept):
 
 
 def check_ed25519_material(entry, signature):
-    """The Ed25519 KEY MATERIAL rule (S03 review R-2), judged here BEFORE the unedited reference, which reduces nothing mod L
-    and accepts a non-canonical R: the key must be a canonical prime-order point, the signature's R canonical and S < L.
-    What is malformed (not base64, the wrong length) is left to the reference's own words."""
+    """The Ed25519 KEY MATERIAL rule (S03 review R-2), judged here BEFORE verify_receipt.py: the key must be a
+    canonical prime-order point, the signature's R canonical and S < L. What is malformed (not base64, the wrong
+    length) is left to verify_receipt.py's own words."""
     published = entry.get("public_key")
     raw_key = b64(published) if isinstance(published, str) else None
     if raw_key is not None and len(raw_key) == 32 and not ed25519_key_acceptable(raw_key):
@@ -557,7 +591,7 @@ def check_kms_key(metadata, key_id, entry):
 
 
 def check_lab_record(payload, key_id, act_hash, entry):
-    """Steps 5 to 8 of the module docstring, over the signed bytes."""
+    """Steps 5 to 9 of the module docstring, over the signed bytes."""
     try:
         signed = loads_strict(payload)
     except ValueError:
@@ -609,7 +643,7 @@ def check_lab_record(payload, key_id, act_hash, entry):
 
     # REQ-189 (R2-4, its GAP R189-W7 as the reds read it): a record-only act (a CEASE) binds its
     # display's digest and no act hash; --act-hash names that digest.
-    if metadata.get("verdict") == "recorded_no_authority":
+    if metadata.get("verdict") in CEASE_VERDICTS:
         if metadata.get("display_digest") != act_hash:
             refuse(
                 "the CEASE record binds display digest %s, not the --act-hash given (%s)."
@@ -624,7 +658,7 @@ def check_lab_record(payload, key_id, act_hash, entry):
         signed_act_hash = signed.get("payload_hash")
     if not isinstance(signed_act_hash, str):
         refuse(
-            "the signed metadata binds no act hash: only a lab statement or decision binds an act.",
+            "the signed metadata binds no act hash.",
             verdict_code="lab_act_hash_absent",
         )
     if signed_act_hash != act_hash:
@@ -632,6 +666,19 @@ def check_lab_record(payload, key_id, act_hash, entry):
             "the record is bound to act hash %s, not the --act-hash given (%s)."
             % (signed_act_hash, act_hash),
             verdict_code="lab_act_hash_mismatch",
+        )
+    # Lane 2a: a label this file does not know says nothing about how the hash was made, so it is not a pass; and no label at
+    # all says less (fix round 1, F2). A CEASE returned above.
+    if "act_hash_alg" not in metadata:
+        refuse(
+            "the signed metadata carries no act_hash_alg member: every record that binds an act is signed with one.",
+            verdict_code="lab_act_hash_alg_absent",
+        )
+    if metadata["act_hash_alg"] not in ACT_HASH_ALGS:
+        refuse(
+            "the signed metadata.act_hash_alg %r is not a label this verifier knows (%s)."
+            % (metadata["act_hash_alg"], ", ".join(ACT_HASH_ALGS)),
+            verdict_code="lab_act_hash_alg_unknown",
         )
     return signed
 
@@ -677,7 +724,7 @@ def main(argv):
     entry = matches[0]
 
     algorithm = entry.get("algorithm")
-    if algorithm not in DEV_KEY_IDS:
+    if not isinstance(algorithm, str) or algorithm not in DEV_KEY_IDS:
         refuse(
             "the lab key file's entry for key_id %r names algorithm %r; this verifier knows "
             "ed25519 and mldsa87 only, and an entry without one is refused (default deny)."

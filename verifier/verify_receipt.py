@@ -3,8 +3,7 @@
 
     python3 verify_receipt.py --receipt RECEIPT.json --registry REGISTRY.json
 
-Python standard library only. No pip installs, no network. Requires Python 3.6 or later;
-verified on 3.12.
+Python standard library only. No pip installs, no network. Tested with Python 3.11 and 3.12.
 
 This is the SECOND, INDEPENDENT implementation. verify_receipt.exs is the reference. Two
 implementations exist so an examiner who distrusts one can run the other, and so neither can drift
@@ -14,8 +13,8 @@ EXIT CODES AND EVERY VERDICT CASE ARE DEFINED IN ONE PLACE: VERDICTS.md, beside 
 the single source, it is parsed by the cross-check test, and this header cites it rather than
 restating it. Four copies of one rule is how the copies drift.
 
-The numbers are frozen at 0, 1, 2, 5, 6 and no others may be introduced. `5` is shared with the
-VIRP verifier; the rest are this project's proposal and are PROVISIONAL. The one distinction to
+The numbers are frozen at 0, 1, 2, 5, 6 and no others may be introduced; 0, 1, 2 and 6 are this
+project's proposal and are PROVISIONAL. The one distinction to
 carry in your head while reading the code below: `1` accuses the receipt, `5` declines to judge it,
 and collapsing them tells an examiner a receipt was forged when it was merely unverifiable.
 
@@ -33,13 +32,14 @@ rule against second implementations, and the exception is bounded by the cross-c
 file and verify_receipt.exs must agree on every case, including known-bad signatures, wrong keys
 and truncated input. Verification only — this file never signs anything.
 
-STRICT, 2026-11-13. The construction is not the bare RFC check: it refuses a non-canonical encoding
-of A or R, A of small order, A of mixed order, R of small order and S >= L before it computes the equation (see
-`_refusal`; the names are the issuing tree's). Without them the identity key (01 00 .. 00) verifies
-R = [S]B for every message. VERDICTS.md states the rule and its verdict. Scalar multiplication is
-in extended coordinates (RFC 8032 section 5.1.4), one inversion at the end.
+STRICT VERIFICATION. Before it computes the Ed25519 equation (RFC 8032 section 5.1.7) this file
+refuses: a non-canonical encoding of the public key A or of R, an A or R of small order, an A of
+mixed order, and an S that is not below L (see `_refusal`). Without these refusals the identity
+key (01 00 .. 00) verifies R = [S]B for every message, so a signature under it proves nothing.
+VERDICTS.md states the rule and its verdict. Scalar multiplication is in extended coordinates
+(RFC 8032 section 5.1.4), with one inversion at the end.
 
-THE RULE THIS FILE BOUNDS — the verifier-primitive rule (G-212, stated 2026-09-20). Nothing a
+THE RULE THIS FILE BOUNDS — the verifier-primitive rule (stated 2026-09-20). Nothing a
 stranger is asked to check may
 require a primitive this file cannot compute from the standard library: SHA-2/SHA-3/SHAKE, the
 hand-written Ed25519 above, hash-based signatures. ML-DSA, BLS, pairing-based proofs, X.509 and
@@ -47,10 +47,17 @@ ECDSA are OUT — a construction that "gives the verifier X" adds a verification
 whose one stated exception is Ed25519. The import list below is the whole of what this file may
 reach, and the cross-check test pins it exactly.
 
-VERDICT CODES (2026-09-20, REQ-109; G-052 lifted). Every exit-1 and exit-5 message ends with a
-line `verdict_code: <code>`, the same code verify_receipt.exs and the issuing tree name for that
+VERDICT CODES. Every exit-1 and exit-5 message this file writes ends with a line
+`verdict_code: <code>`, the same code verify_receipt.exs and the issuing system name for that
 input, written to STDERR with the message. The cross-check test compares the codes, not only the
 exits, on every corpus row. Exit 0, 2 and 6 carry no code.
+
+NO INPUT ENDS IN A STACK TRACE. A runtime that dies on an uncaught exception exits 1, which
+VERDICTS.md reserves for "the receipt is bad", and writes no code line. So every named member of the
+receipt and of the registry is read through `member`, which answers None for anything that is not
+an object, and every input file is read through `parse_json`, which refuses (exit 2, "cannot read
+input") what verify_receipt.exs refuses. A last-resort guard at the bottom of this file turns an
+exception nobody foresaw into exit 2 with a one-line message, never into 0 or 1.
 """
 
 import base64
@@ -58,6 +65,21 @@ import hashlib
 import json
 import re
 import sys
+
+# THE READING RULE. One rule, stated in VERDICTS.md ("how an input is read") and applied by this
+# file, by verify_receipt.exs and by the issuing system: what one of them reads, all three read, to
+# the same value; what one refuses, all three refuse. The three numbers below are that rule's.
+#
+# The largest input file that is read, in bytes. A larger file is refused (exit 2) before it is
+# parsed, and no more than this many bytes plus one are ever taken into memory.
+MAX_INPUT_BYTES = 1048576
+# A number is read as a JSON number, which has no NaN, no Infinity and no value beyond a double. An
+# integer written with more characters than this, its sign included, is not read: the issuing
+# system's JSON reader refuses it, and so do both verifiers.
+MAX_INTEGER_CHARACTERS = 1024
+# The deepest nesting of arrays and objects that is read. Python's own recursion limit would
+# otherwise decide, and decide differently from the other runtimes.
+MAX_DEPTH = 64
 
 EXIT_VERIFIED, EXIT_INVALID, EXIT_USAGE, EXIT_NO_TRUST, EXIT_COMPROMISED = 0, 1, 2, 5, 6
 
@@ -128,10 +150,10 @@ def _on_curve(point):
 
 
 def _decode_point(raw):
-    """RFC 8032 section 5.1.3, strictly. ValueError, with the refusal's name first, for: y >= p
-    (`ed25519_non_canonical`), x = 0 with the sign bit set (`ed25519_non_canonical`), and no point
-    on the curve for that y (`ed25519_not_on_curve`). The names are the issuing tree's
-    (PublicKey.ed25519_decode); the verdict is the same for all of them (see ed25519_verify)."""
+    """Decode a point as RFC 8032 section 5.1.3 requires, and no more leniently. Raises ValueError,
+    beginning with the refusal's identifier, for: y >= p (`ed25519_non_canonical`), x = 0 with the
+    sign bit set (`ed25519_non_canonical`), and no point on the curve for that y
+    (`ed25519_not_on_curve`). The verdict is the same for all of them (see ed25519_verify)."""
     n = int.from_bytes(raw, "little")
     sign = n >> 255
     y = n & ((1 << 255) - 1)
@@ -162,19 +184,19 @@ def _prime_order(point):
 
 
 def _refusal(signature, public_key):
-    """The name of the first reason `signature` / `public_key` is refused before any equation is
-    computed, or None. A signature that is not 64 bytes or a key that is not 32 is refused as
-    non-canonical, never raised. The names are the issuing tree's (PublicKey, Edwards25519), one
-    vocabulary across the implementations:
+    """The identifier of the first reason `signature` / `public_key` is refused before the equation
+    is computed, or None. A signature that is not 64 bytes or a key that is not 32 is refused as
+    non-canonical, never raised. The identifiers:
 
       ed25519_non_canonical  A or R is not a canonical encoding (y >= p; x = 0 with the sign bit
                              set), or S >= L
       ed25519_not_on_curve   A or R is not a point
       ed25519_small_order    A or R is of small order: [8]P is the identity (decided by
                              arithmetic, never by a list of encodings)
-      ed25519_mixed_order    A is not in the prime-order subgroup: [L]A is not the identity (a*B
-                             plus a torsion point). Implementations that reduce h modulo L and
-                             ones that do not would otherwise disagree, depending on h mod 8.
+      ed25519_mixed_order    A is not in the prime-order subgroup: [L]A is not the identity (A is
+                             a multiple of B plus a point of small order). Such a key is refused
+                             because implementations that reduce h modulo L and ones that do not
+                             can otherwise disagree about the same signature, depending on h mod 8.
     """
     if len(signature) != 64 or len(public_key) != 32:
         return "ed25519_non_canonical"
@@ -213,16 +235,144 @@ def ed25519_verify(signature, message, public_key):
 
 # --- verdicts ------------------------------------------------------------------------------------
 # Order, and the whole of it, is VERDICTS.md's "the order the checks run in". Every trust question
-# precedes every accusation, because an accusation requires standing.
+# (exit 5) but the signing window precedes every accusation (exit 1), because an accusation requires
+# standing. The compromised verdict (6) and the signing-window check come after the signature check,
+# so only a receipt whose signature verified reaches them.
 STATUSES = ("example", "active", "retired", "compromised")
 ENVELOPE = ("signature", "key_id", "signed_payload", "receipt_hash")
 IGNORED = ("public_key", "_note")
-TS = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
+TS = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\Z")
+
+
+def member(obj, name):
+    """`obj[name]` when `obj` is a JSON object, and None for anything else (a list, a string, a
+    number, null, a missing member). Every read of a named member of the receipt, the registry, a
+    registry entry or the signed bytes goes through here, so a value of the wrong shape is an absent
+    value and meets the same typed refusal an absent value meets. (The displayed-field check walks
+    the receipt's own members, of two values already known to be objects; the note on exit 0 asks
+    only whether the signed bytes, already known to be an object, carry sequence and
+    previous_hash.)"""
+    return obj.get(name) if isinstance(obj, dict) else None
+
+
+def shown(value):
+    """A value for a message: itself when it is text, otherwise a fixed phrase (never a repr of
+    something the registry or the receipt chose the shape of)."""
+    return value if isinstance(value, str) else "an unstated instant"
+
+
+_SURROGATE = re.compile("[\ud800-\udfff]")
+
+
+def _too_deep(text):
+    """True when arrays and objects nest more than MAX_DEPTH deep, outside strings.
+
+    ONE pass over the characters, with two flags: inside a string, and after a backslash inside a
+    string. The time is linear in the length of the text whatever the text is; in particular a
+    string that never ends is walked once, to the end of the text. A document that is not JSON may
+    be counted wrongly here; it is then refused by the parser all the same."""
+    depth = 0
+    in_string = False
+    escaped = False
+    for char in text:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+        elif char == '"':
+            in_string = True
+        elif char == "[" or char == "{":
+            depth += 1
+            if depth > MAX_DEPTH:
+                return True
+        elif char == "]" or char == "}":
+            depth -= 1
+    return False
+
+
+def _object(pairs):
+    seen = {}
+    for name, value in pairs:
+        if name in seen:
+            raise ValueError("an object repeats the member name %r" % name)
+        seen[name] = value
+    return seen
+
+
+def _constant(name):
+    raise ValueError("%s is not a JSON number" % name)
+
+
+def _integer(text):
+    if len(text) > MAX_INTEGER_CHARACTERS:
+        raise ValueError("an integer of more than %d characters" % MAX_INTEGER_CHARACTERS)
+    return int(text)
+
+
+def _float(text):
+    # A negative zero written with an exponent and no fraction (`-0e5`). This reader keeps the
+    # sign (-0.0); Erlang's reader, under verify_receipt.exs and the issuing system, drops it
+    # (0.0). A text that two runtimes read to two values is not read. Written with a fraction
+    # (`-0.0`, `-0.0e5`) every reader keeps the sign, and it is read.
+    if text[:2] == "-0" and text[2:3] in ("e", "E"):
+        raise ValueError("a negative zero written with an exponent and no fraction (%s)" % text)
+    value = float(text)
+    if value in (float("inf"), float("-inf")):
+        raise ValueError("a number beyond the range of a double")
+    return value
+
+
+def parse_json(text):
+    """The JSON value in `text`, or ValueError. Stricter than `json.loads` in exactly the ways
+    verify_receipt.exs and the issuing system are: NaN, Infinity and numbers beyond a double are
+    refused, and so is a negative zero written with an exponent and no fraction (`-0e5`: the two
+    runtimes read it to two values); an object that repeats a member name is refused, at every
+    depth, the names compared
+    after their escapes are decoded (one JSON reader keeps the first occurrence and another the
+    last, so a repeated name is two documents in one); an integer of more than
+    MAX_INTEGER_CHARACTERS characters is refused; a string holding an unpaired surrogate is
+    refused; and nesting deeper than MAX_DEPTH is refused. The input files AND the signed bytes are
+    read through here: there is one rule and no exception to it."""
+    if _too_deep(text):
+        raise ValueError("nested more than %d levels deep" % MAX_DEPTH)
+    value = json.loads(
+        text,
+        object_pairs_hook=_object,
+        parse_constant=_constant,
+        parse_int=_integer,
+        parse_float=_float,
+    )
+    stack = [value]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, str):
+            if _SURROGATE.search(item):
+                raise ValueError("a string holds an unpaired surrogate")
+        elif isinstance(item, list):
+            stack.extend(item)
+        elif isinstance(item, dict):
+            for name, inner in item.items():
+                if _SURROGATE.search(name):
+                    raise ValueError("a member name holds an unpaired surrogate")
+                stack.append(inner)
+    return value
+
+
+def read_json(path):
+    # a bounded read: a file larger than the bound is never taken into memory whole
+    with open(path, "rb") as handle:
+        raw = handle.read(MAX_INPUT_BYTES + 1)
+    if len(raw) > MAX_INPUT_BYTES:
+        raise ValueError("%s is larger than %d bytes" % (path, MAX_INPUT_BYTES))
+    return parse_json(raw.decode("utf-8"))
 
 
 def die(code, message, stream=sys.stderr, verdict_code=None):
     # stdout first: the public_key note is block-buffered on a pipe and would otherwise land
-    # AFTER the verdict when a caller merges the streams (REQ-109, the reds review's M7)
+    # AFTER the verdict when a caller merges the streams
     sys.stdout.flush()
     if verdict_code is not None:
         message = message + "\n\nverdict_code: " + verdict_code
@@ -231,7 +381,16 @@ def die(code, message, stream=sys.stderr, verdict_code=None):
     sys.exit(code)
 
 
+# Base64 as verify_receipt.exs and the issuing system read it: groups of four characters of the
+# standard alphabet, the last group padded with `=` to four, and nothing else. Python's decoder
+# alone also takes a full group followed by stray `=`; the form is checked here, so that decoder
+# does not decide.
+_BASE64 = re.compile(r"(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?\Z")
+
+
 def b64(value):
+    if not _BASE64.match(value):
+        return None
     try:
         return base64.b64decode(value, validate=True)
     except Exception:
@@ -244,8 +403,22 @@ def timestamp(value):
     Only `YYYY-MM-DDTHH:MM:SSZ` is accepted. A verifier that accepts two spellings of an instant is
     a verifier whose two implementations eventually disagree about one of them, and the disagreement
     surfaces first on a real receipt rather than in the corpus. Not coerced, not guessed: refused.
+
+    The form alone is not enough: the text must also be a real instant of the proleptic Gregorian
+    calendar. Month 01 to 12, a day that month has in that year (year 0000 is a leap year), hour 00
+    to 23, minute and second 00 to 59; there is no leap second and no 24:00:00. `2026-02-30` has
+    the form, and comparing it as text would place it between two real days. The arithmetic is
+    written out, the same in verify_receipt.exs, so no library decides.
     """
     if not isinstance(value, str) or not TS.match(value):
+        return None
+    year, month, day = int(value[0:4]), int(value[5:7]), int(value[8:10])
+    hour, minute, second = int(value[11:13]), int(value[14:16]), int(value[17:19])
+    if month < 1 or month > 12 or hour > 23 or minute > 59 or second > 59:
+        return None
+    leap = year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
+    days = (31, 29 if leap else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)[month - 1]
+    if day < 1 or day > days:
         return None
     return (value[0:4], value[5:7], value[8:10], value[11:13], value[14:16], value[17:19])
 
@@ -255,7 +428,8 @@ def tagged(value):
 
     VERDICTS.md's canonical encoding never merges integers and floats; Python's `==` does, and
     `True == 1` as well. Comparing untagged would make a contradiction invisible on exactly the
-    values an adversary would choose.
+    values an adversary would choose. A float is compared by its exact value AND its sign, so
+    `-0.0` displayed over a signed `0.0` is a contradiction (`==` calls them equal).
     """
     if value is None:
         return ("null",)
@@ -264,7 +438,7 @@ def tagged(value):
     if isinstance(value, int):
         return ("int", value)
     if isinstance(value, float):
-        return ("float", value)
+        return ("float", value.hex())
     if isinstance(value, str):
         return ("str", value)
     if isinstance(value, list):
@@ -275,6 +449,13 @@ def tagged(value):
 
 
 def main(argv):
+    # The messages carry characters outside ASCII. Under an ASCII or Latin-1 stream a strict encoder
+    # would raise in the middle of a verdict, so a verified receipt could end in a stack trace; the
+    # characters are written as escapes instead, and the verdict and its exit are unchanged.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="backslashreplace")
+
     opts = {}
     index = 0
     while index < len(argv):
@@ -311,10 +492,8 @@ def main(argv):
         )
 
     try:
-        with open(opts["receipt"]) as handle:
-            receipt = json.load(handle)
-        with open(opts["registry"]) as handle:
-            registry = json.load(handle)
+        receipt = read_json(opts["receipt"])
+        registry = read_json(opts["registry"])
     except (OSError, ValueError) as error:
         die(EXIT_USAGE, "cannot read input: %s" % error)
 
@@ -322,18 +501,18 @@ def main(argv):
         die(EXIT_USAGE, "the receipt must be a JSON object")
 
     payload, signature, key_id = (
-        receipt.get("signed_payload"),
-        receipt.get("signature"),
-        receipt.get("key_id"),
+        member(receipt, "signed_payload"),
+        member(receipt, "signature"),
+        member(receipt, "key_id"),
     )
     if not all(isinstance(v, str) for v in (payload, signature, key_id)):
         die(EXIT_USAGE, "receipt must carry signed_payload, signature and key_id")
 
     # The receipt may carry a public_key. It is NEVER used.
-    if isinstance(receipt.get("public_key"), str):
+    if isinstance(member(receipt, "public_key"), str):
         print("note: the receipt carries a public_key; it is ignored. Trust comes from --registry.")
 
-    entries = registry.get("entries")
+    entries = member(registry, "entries")
     if not isinstance(entries, list):
         die(
             EXIT_NO_TRUST,
@@ -341,7 +520,8 @@ def main(argv):
             verdict_code="registry_missing_key",
         )
 
-    matches = [e for e in entries if isinstance(e, dict) and e.get("key_id") == key_id]
+    # A key_id that is the empty text names no key, whatever the registry holds under that text.
+    matches = [e for e in entries if member(e, "key_id") == key_id] if key_id != "" else []
 
     if not matches:
         die(
@@ -368,7 +548,7 @@ def main(argv):
         )
 
     entry = matches[0]
-    status = entry.get("status")
+    status = member(entry, "status")
 
     # DEFAULT DENY. The registry defines exactly four statuses. Unknown standing is not good
     # standing, and a status this verifier cannot interpret is a reason to refuse, never to pass.
@@ -392,15 +572,17 @@ def main(argv):
             verdict_code="key_is_example",
         )
 
-    # The entry must hash to its own published fingerprint BEFORE anything it says is believed,
-    # including its status and its window. An entry failing its own integrity check may have been
+    # The entry must hash to its own published fingerprint BEFORE its key, its window or a status of
+    # active, retired or compromised is believed (an absent, undefined or example status is refused
+    # first: VERDICTS.md, step 2). An entry failing its own integrity check may have been
     # substituted, and reporting a benign story read out of it would be the wrong answer.
     # an absent or non-string public_key is a fingerprint failure (the Elixir verifier's and the
-    # tree's order; the fix review's F2: `or ""` hashed to sha256("") and reached the key-length
-    # site instead)
-    published = entry.get("public_key")
+    # issuing system's order; coalescing the absent key to `""` would hash to sha256(""), which
+    # matches only a stated fingerprint equal to that value, and such an entry would then reach
+    # the key-length check instead of failing as a fingerprint mismatch)
+    published = member(entry, "public_key")
     raw_key = b64(published) if isinstance(published, str) else None
-    stated = entry.get("public_key_fingerprint")
+    stated = member(entry, "public_key_fingerprint")
     if raw_key is None or not isinstance(stated, str) or hashlib.sha256(raw_key).hexdigest() != stated:
         die(
             EXIT_NO_TRUST,
@@ -411,7 +593,7 @@ def main(argv):
             verdict_code="key_fingerprint_mismatch",
         )
 
-    # REQ-109 (G-255): a public_key that is not 32 raw bytes is not an Ed25519 key. A defect in
+    # A public_key that is not 32 raw bytes is not an Ed25519 key. A defect in
     # the TRUST ROOT is a trust question, never an accusation of the receipt. The entry hashed
     # to its own fingerprint, so this is what the registry published.
     if len(raw_key) != 32:
@@ -425,7 +607,7 @@ def main(argv):
             verdict_code="key_public_key_malformed",
         )
 
-    valid_from, valid_to = timestamp(entry.get("valid_from")), entry.get("valid_to")
+    valid_from, valid_to = timestamp(member(entry, "valid_from")), member(entry, "valid_to")
     if valid_from is None:
         die(
             EXIT_NO_TRUST,
@@ -445,27 +627,35 @@ def main(argv):
             verdict_code="key_valid_to_unreadable",
         )
 
+    # The signed bytes are read by the same rule as the input files. Bytes that are not read
+    # (not JSON, an object repeating a member name, too deep, a number that is not read) carry no
+    # readable occurred_at: a trust question, asked before anything accuses the receipt.
+    unread = ""
     try:
-        signed = json.loads(payload)
+        signed = parse_json(payload)
         if not isinstance(signed, dict):
             signed = None
-    except ValueError:
+            unread = "they are not a JSON object"
+    except ValueError as error:
         signed = None
+        unread = "they are not JSON that every implementation reads alike (%s)" % error
 
-    occurred = timestamp(signed.get("occurred_at")) if signed else None
+    occurred = timestamp(member(signed, "occurred_at"))
     if occurred is None:
         die(
             EXIT_NO_TRUST,
-            "TRUST NOT ESTABLISHED — the signed bytes carry no readable occurred_at.\n\n"
+            "TRUST NOT ESTABLISHED — the signed bytes carry no readable occurred_at%s.\n\n"
             "occurred_at is the only signing time a receipt carries, and it is what the key's\n"
-            "signing window is checked against. Accepted form is YYYY-MM-DDTHH:MM:SSZ exactly;\n"
-            "it is refused rather than coerced, so the two implementations cannot drift.",
+            "signing window is checked against. Accepted form is YYYY-MM-DDTHH:MM:SSZ exactly,\n"
+            "and a real calendar instant; it is refused rather than coerced, so the\n"
+            "implementations cannot drift." % (": " + unread if unread else ""),
             verdict_code="signed_occurred_at_unreadable",
         )
 
-    # --- the receipt itself. Everything below accuses the receipt, so it runs only once the
-    # --- registry has given us the standing to make an accusation.
-    expected_hash = receipt.get("receipt_hash")
+    # --- the receipt itself. From here to the signature check everything accuses the receipt, so
+    # --- it runs only once the registry has given us the standing to make an accusation. The
+    # --- compromised-key and signing-window verdicts after the signature check do not accuse it.
+    expected_hash = member(receipt, "receipt_hash")
     if not isinstance(expected_hash, str):
         die(
             EXIT_INVALID,
@@ -494,8 +684,8 @@ def main(argv):
             verdict_code="displayed_field_mismatch",
         )
 
-    # REQ-109 (G-255): a signature that does not decode or is not 64 raw bytes is MALFORMED --
-    # the taxonomy's word, the Elixir verifier's and the issuing tree's; one that decodes and
+    # A signature that does not decode or is not 64 raw bytes is MALFORMED --
+    # the taxonomy's word, the Elixir verifier's and the issuing system's; one that decodes and
     # fails the curve check is INVALID.
     raw_signature = b64(signature)
     if raw_signature is None or len(raw_signature) != 64:
@@ -528,7 +718,7 @@ def main(argv):
             "Sound for honest history, advisory against a forger. Closing the gap requires anchoring\n"
             "signing times outside the issuing system; that is named future work.\n\n"
             "Exit code 6 is PROVISIONAL, pending reconciliation with the VIRP vocabulary."
-            % (key_id, entry.get("status_changed_at")),
+            % (key_id, shown(member(entry, "status_changed_at"))),
             stream=sys.stdout,
         )
 
@@ -545,24 +735,51 @@ def main(argv):
             "Sound for honest history, advisory against a forger: occurred_at is asserted by the\n"
             "receipt, and an adversary holding the key can backdate it."
             % (
-                signed.get("occurred_at"),
+                member(signed, "occurred_at"),
                 key_id,
-                entry.get("valid_from"),
-                entry.get("valid_to"),
+                member(entry, "valid_from"),
+                member(entry, "valid_to"),
             ),
             verdict_code="signed_outside_key_validity",
         )
 
+    # A signature binds the receipt's position in its chain only when the signed bytes carry both
+    # members. Nothing above requires either, so the note says which is absent.
+    absent = [name for name in ("sequence", "previous_hash") if name not in signed]
+    if absent:
+        note = (
+            "Note: the signed bytes carry no %s, so this signature does not bind the receipt's "
+            "position in a chain." % " and no ".join(absent)
+        )
+    else:
+        note = (
+            "Note what this attests: the signed bytes carry the receipt's sequence and previous_hash, so\n"
+            "a valid signature binds the receipt's POSITION IN ITS CHAIN as well as its content."
+        )
     print(
         "VERIFIED — signature is valid under key_id %r (status: %s).\n\n"
         "A retired key verifies exactly like an active one WITHIN ITS SIGNING WINDOW. Rotation does\n"
         "not invalidate receipts already issued; only new signing stops.\n\n"
-        "Note what this attests: the signed bytes carry the receipt's sequence and previous_hash, so\n"
-        "a valid signature binds the receipt's POSITION IN ITS CHAIN as well as its content."
-        % (key_id, status)
+        "%s" % (key_id, status, note)
     )
     sys.exit(EXIT_VERIFIED)
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    try:
+        main(sys.argv[1:])
+    except SystemExit:
+        raise
+    except BaseException as error:
+        # Last resort, for an exception no check above foresaw. Exit 2 ("nothing was measured"),
+        # because neither 0 nor 1 may be said of an input this file could not evaluate, and no
+        # stack trace: the type of the exception is named so the defect can be reported.
+        try:
+            sys.stdout.flush()
+            print(
+                "internal error (%s): this verifier could not evaluate the input; nothing was measured."
+                % type(error).__name__,
+                file=sys.stderr,
+            )
+        finally:
+            sys.exit(EXIT_USAGE)

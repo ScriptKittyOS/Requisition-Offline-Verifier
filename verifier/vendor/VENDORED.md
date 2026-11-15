@@ -19,8 +19,8 @@
 **How it is loaded.** It is never imported by name. `verifier/verify_offline.py` (`load_mldsa`) reads the
 file by path, refuses it unless its SHA-256 equals the pinned value above, then executes it as a module.
 
-**What it was checked against** in the source tree this file was copied from. The tests and vectors are
-not part of this repository.
+**What it was checked against** in the source tree this file was copied from. The tests are not part of this
+repository; the two vector files are, in `interop/vectors/`, used by `interop/`.
 
 - NIST ACVP-Server `ML-DSA-sigVer-FIPS204/internalProjection.json` at release v1.1.0.43 (commit
   `975de31eb83d87039ec88934fdc47d8c312b892d`): the ML-DSA-87 pure external-interface group (tgId 5,

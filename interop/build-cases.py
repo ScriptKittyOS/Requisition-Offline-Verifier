@@ -10,11 +10,11 @@ Python standard library only. One case per line, six tab-separated fields:
 Fields are lower-case hex; "-" means empty; expected is 1 (must verify) or 0 (must not).
 
 The four record cases take their bytes from the same fields verifier/verify_offline.py reads:
-  signature  = base64-decoded cosignature.signature        (check_mldsa87, lines 375 and 381)
-  message    = UTF-8 bytes of signed_payload               (check_mldsa87, line 381)
+  signature  = base64-decoded cosignature.signature        (check_mldsa87)
+  message    = UTF-8 bytes of signed_payload               (check_mldsa87)
   public key = base64-decoded public_key of the key entry named by cosignature.key_id
-               (check_cosignature, line 492; check_mldsa87, line 370)
-  context    = empty                                       (check_mldsa87, line 381: no context argument)
+               (check_cosignature, check_mldsa87)
+  context    = empty                                       (check_mldsa87: no context argument)
 For each record there is the case as published (expected 1) and the same case with bit 0 of byte 100 of
 the signature flipped (expected 0).
 """
