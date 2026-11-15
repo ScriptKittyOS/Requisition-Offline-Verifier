@@ -18,8 +18,9 @@ func unhex(s string) []byte {
 		return nil
 	}
 	b, err := hex.DecodeString(s)
-	if err != nil {
-		panic(err)
+	if err != nil || len(b) == 0 {
+		fmt.Fprintln(os.Stderr, "bad hex")
+		os.Exit(2)
 	}
 	return b
 }
@@ -34,6 +35,7 @@ func verify(pk, sig, msg, ctx []byte) bool {
 
 func main() {
 	if len(os.Args) != 2 {
+		fmt.Fprintln(os.Stderr, "usage: main CASES.tsv")
 		os.Exit(2)
 	}
 	f, err := os.Open(os.Args[1])
@@ -47,13 +49,27 @@ func main() {
 	for sc.Scan() {
 		p := strings.Split(sc.Text(), "\t")
 		if len(p) != 6 {
+			fmt.Fprintln(os.Stderr, "bad line")
 			os.Exit(2)
 		}
-		got := verify(unhex(p[1]), unhex(p[2]), unhex(p[3]), unhex(p[4]))
+		if p[5] != "0" && p[5] != "1" {
+			fmt.Fprintln(os.Stderr, "bad expected result in case "+p[0])
+			os.Exit(2)
+		}
+		pk, sig, msg, ctx := unhex(p[1]), unhex(p[2]), unhex(p[3]), unhex(p[4])
+		got := verify(pk, sig, msg, ctx)
 		n++
 		if got != (p[5] == "1") {
 			wrong = append(wrong, p[0])
 		}
+	}
+	if err := sc.Err(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	if n == 0 {
+		fmt.Fprintln(os.Stderr, "no cases")
+		os.Exit(2)
 	}
 	fmt.Printf("Go crypto/mldsa (%s): %d cases, %d disagree with the expected result %v\n", runtime.Version(), n, len(wrong), wrong)
 	if len(wrong) > 0 {

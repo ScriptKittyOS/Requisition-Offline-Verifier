@@ -22,5 +22,11 @@ Go crypto/mldsa (go1.27.4): 260 cases, 0 disagree with the expected result []
 ## Exit status
 
 0 when no case disagrees with its expected result; 1 when at least one does (the result line names the case ids);
-2 on a bad command line or a malformed cases file. A line of `interop/cases.tsv` has six tab-separated fields: case
-id, public key, signature, message, context, expected result (1 or 0), in lower-case hex with `-` for empty.
+2 when the run is not valid and no result line is printed: a wrong number of arguments, a cases file that cannot be
+read, a line that is not six tab-separated fields, a field that is not hex (or `-`), an expected result other than 0 or 1,
+or a cases file with no case in it. Only a case that was parsed and given to the library can agree or disagree.
+A line of `interop/cases.tsv` has six tab-separated fields: case id, public key, signature, message, context, expected
+result (1 or 0), in lower-case hex with `-` for empty.
+
+`go run` reports any non-zero exit of the program as exit status 1 and prints `exit status N` on standard error;
+build with `go build` to see the program's own exit status.

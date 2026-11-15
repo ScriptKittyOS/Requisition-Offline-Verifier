@@ -8,15 +8,14 @@ they are read by `interop/build-cases.py`.
 - Source: https://github.com/usnistgov/ACVP-Server, release **v1.1.0.43**, commit
   `975de31eb83d87039ec88934fdc47d8c312b892d`, file
   `gen-val/json-files/ML-DSA-sigVer-FIPS204/internalProjection.json`.
-- Upstream file sha256: `47cdd6314c7f746d02421ffcba89d4dbc7bb875ac49e07a029fdfc26fba55437` (the same
-  file and digest Requisition pins).
+- Upstream file sha256: `47cdd6314c7f746d02421ffcba89d4dbc7bb875ac49e07a029fdfc26fba55437`.
 - **Modified 2026-11-09:** kept only the test group whose `parameterSet` is `ML-DSA-87`,
   `signatureInterface` `external`, `preHash` `pure`, `externalMu` false (tgId 5, tcIds 61-75: 3 valid,
-  12 invalid: modified message, commitment, hint, z), the form the lab seat signs and the vendored
-  verifier exposes; dropped each test's `sk` (the verifier never needs a private key). Every other
+  12 invalid: modified message, commitment, hint, z), the form the record's ML-DSA-87 signatures use and
+  `verifier/vendor/mldsa.py` exposes; dropped each test's `sk` (the verifier never needs a private key). Every other
   member is as published. File sha256 after the change:
   `768460682c2d81e101eeeefac12a0cfdb5d4712e0f718c2212bcfdf0a4a90522`.
-- Not carried, with the reason: tgId 6 (HashML-DSA pre-hash: not a form the lab signs), tgId 11
+- Not carried, with the reason: tgId 6 (HashML-DSA pre-hash: not the form the record uses), tgId 11
   (external mu) and tgId 12 (internal interface): the vendored module's public API takes a message and
   a context, not M' or mu.
 - Licence: NIST-developed software notice, kept intact in `LICENSE.nist-acvp-server` as it asks. Source:

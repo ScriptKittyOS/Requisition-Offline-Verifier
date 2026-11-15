@@ -30,7 +30,7 @@ run() {
   line=$("$@" 2>"$log"); code=$?
   case $code in
     0) ran=$((ran + 1)); printf '%s\n' "$line" ;;
-    1) ran=$((ran + 1)); bad=$((bad + 1)); printf '%s\n' "$line" ;;
+    1) ran=$((ran + 1)); bad=$((bad + 1)); if [ -n "$line" ]; then printf '%s\n' "$line"; else printf '%s: FAILED (exit 1): %s\n' "$name" "$(tail -n 1 "$log")"; fi ;;
     *) ran=$((ran + 1)); bad=$((bad + 1)); printf '%s: FAILED to run (exit %s): %s\n' "$name" "$code" "$(tail -n 1 "$log")" ;;
   esac
 }
@@ -72,8 +72,7 @@ if [ -n "${GO_BIN:-}" ] && [ -x "$GO_BIN" ]; then
 else skip go-crypto-mldsa "GO_BIN is not set to a go program"; fi
 
 if [ -n "${BC_JAR:-}" ] && [ -f "$BC_JAR" ] && command -v java >/dev/null 2>&1; then
-  bcv=$(basename "$BC_JAR" .jar | sed 's/^bcprov-[a-z0-9]*-//')
-  run bouncy-castle java -cp "$BC_JAR" "$here/verifiers/bouncy-castle/BcVerify.java" "$cases" "$bcv"
+  run bouncy-castle java -cp "$BC_JAR" "$here/verifiers/bouncy-castle/BcVerify.java" "$cases"
 else skip bouncy-castle "BC_JAR is not set to a jar file, or java is not on PATH"; fi
 
 cverifier aws-lc AWSLC_PREFIX AWSLC_VERIFY

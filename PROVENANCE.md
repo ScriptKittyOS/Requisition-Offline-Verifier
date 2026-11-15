@@ -67,7 +67,7 @@ The test vectors are third-party files. Their sources, pinned commits and licenc
 | `interop/vectors/LICENSE.nist-acvp-server` | NIST ACVP-Server | `7d1308ff19c82f712268ec64951db2fa0ed04b7ec6158b449842210ad79e3d85` | none |
 | `interop/vectors/LICENSE.wycheproof` | C2SP Wycheproof | `58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd` | none |
 
-`interop/vectors/PROVENANCE.md` is the provenance note of the vector files; two of its lines that referred to files
+`interop/vectors/PROVENANCE.md` is the provenance note of the vector files; two passages (three lines) that referred to files
 outside this repository were reworded for this repository.
 
 No file from v0.1.0 changed except `README.md` (an `interop/` entry in the file list, a section "Other verifiers", a

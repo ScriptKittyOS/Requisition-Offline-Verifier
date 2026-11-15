@@ -26,18 +26,38 @@ def verify(pk, sig, msg, ctx):
 
 
 def unhex(s):
-    return b"" if s == "-" else bytes.fromhex(s)
+    if s == "-":
+        return b""
+    if not s or len(s) % 2 or any(c not in "0123456789abcdefABCDEF" for c in s):
+        print("bad hex", file=sys.stderr)
+        sys.exit(2)
+    return bytes.fromhex(s)
 
 
 n, wrong = 0, []
-for row in open(sys.argv[1]):
-    fields = row.rstrip("\n").split("\t")
+try:
+    rows = open(sys.argv[1]).read().split("\n")
+except (OSError, UnicodeDecodeError) as e:
+    print("cannot read %s" % sys.argv[1], file=sys.stderr)
+    sys.exit(2)
+for row in rows:
+    if not row:
+        continue
+    fields = row.rstrip("\r").split("\t")
     if len(fields) != 6:
+        print("bad line", file=sys.stderr)
         sys.exit(2)
     case_id, pk, sig, msg, ctx, expected = fields
+    if expected not in ("0", "1"):
+        print("bad expected result in case %s" % case_id, file=sys.stderr)
+        sys.exit(2)
+    args = (unhex(pk), unhex(sig), unhex(msg), unhex(ctx))
     n += 1
-    if verify(unhex(pk), unhex(sig), unhex(msg), unhex(ctx)) != (expected == "1"):
+    if verify(*args) != (expected == "1"):
         wrong.append(case_id)
+if n == 0:
+    print("no cases", file=sys.stderr)
+    sys.exit(2)
 label = "mldsa-py 1.0.1 (sha256 %s, Python %s)" % (
     hashlib.sha256(open(path, "rb").read()).hexdigest()[:16], sys.version.split()[0])
 print("%s: %d cases, %d disagree with the expected result %s" % (label, n, len(wrong), wrong))

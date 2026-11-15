@@ -15,7 +15,7 @@
 static std::optional<std::vector<uint8_t>> unhex(const std::string& s) {
    std::vector<uint8_t> out;
    if(s == "-") return out;
-   if(s.size() % 2) return std::nullopt;
+   if(s.empty() || s.size() % 2) return std::nullopt;
    auto hv = [](char c) { return c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1; };
    for(size_t i = 0; i < s.size(); i += 2) {
       int h = hv(s[i]), l = hv(s[i + 1]);
@@ -39,8 +39,9 @@ static bool verify(const std::vector<uint8_t>& pk, const std::vector<uint8_t>& s
 }
 
 int main(int argc, char** argv) {
-   if(argc < 2) return 2;
+   if(argc != 2) { std::cerr << "usage: verify CASES.tsv\n"; return 2; }
    std::ifstream f(argv[1]);
+   if(!f) { std::cerr << "cannot read " << argv[1] << "\n"; return 2; }
    std::string line;
    int n = 0;
    std::vector<std::string> bad;
@@ -56,10 +57,14 @@ int main(int argc, char** argv) {
       }
       if(p.size() != 6) { std::cerr << "bad line\n"; return 2; }
       auto pk = unhex(p[1]), sig = unhex(p[2]), msg = unhex(p[3]), ctx = unhex(p[4]);
-      bool got = pk && sig && msg && ctx && verify(*pk, *sig, *msg, *ctx);
+      if(!pk || !sig || !msg || !ctx) { std::cerr << "bad hex in case " << p[0] << "\n"; return 2; }
+      if(p[5] != "0" && p[5] != "1") { std::cerr << "bad expected result in case " << p[0] << "\n"; return 2; }
+      bool got = verify(*pk, *sig, *msg, *ctx);
       n++;
       if(got != (p[5] == "1")) bad.push_back(p[0]);
    }
+   if(f.bad()) { std::cerr << "read error\n"; return 2; }
+   if(n == 0) { std::cerr << "no cases\n"; return 2; }
    std::string ids;
    for(size_t i = 0; i < bad.size(); i++) ids += (i ? ", " : "") + bad[i];
    std::cout << "Botan " << Botan::short_version_string() << ": " << n << " cases, " << bad.size()

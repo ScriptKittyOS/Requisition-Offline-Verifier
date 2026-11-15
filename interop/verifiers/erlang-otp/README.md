@@ -23,16 +23,8 @@ Result measured 2026-11-14 (Linux x86-64):
 Erlang/OTP 28 :crypto on OpenSSL 3.5.9 29 Sep 2026: 239 cases with the empty context, 0 disagree with the expected result []; 21 cases with a context not run (no context argument)
 ```
 
-Exit status: 0 when no case that ran disagrees, 1 when one does, 2 on a bad command line, 3 when this Erlang has no
+Exit status: 0 when no case that ran disagrees, 1 when one does, 2 when the run is not valid and no result line is
+printed (a wrong number of arguments, a cases file that cannot be read, a line that is not six tab-separated fields, a
+field that is not hex (or `-`), an expected result other than 0 or 1, or no case run), 3 when this Erlang has no
 ML-DSA-87. A line of `interop/cases.tsv` has six tab-separated fields: case id, public key, signature, message,
 context, expected result (1 or 0), in lower-case hex with `-` for empty.
-
-Exit status: 0 when no case that ran disagrees, 1 when one does, 2 on a bad command line, 3 when this Erlang has no
-ML-DSA-87. A line of `interop/cases.tsv` has six tab-separated fields: case id, public key, signature, message,
-context, expected result (1 or 0), in lower-case hex with `-` for empty.
-
-## Exit status
-
-0 when no case disagrees with its expected result; 1 when at least one does (the result line names the case ids);
-2 on a bad command line or a malformed cases file. A line of `interop/cases.tsv` has six tab-separated fields: case
-id, public key, signature, message, context, expected result (1 or 0), in lower-case hex with `-` for empty.
