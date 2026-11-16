@@ -1,0 +1,420 @@
+{
+  "act_hash": "b21d0cb4b0e92e2ca48437f4309e49cb9c607e3186a94ba3ec1480883de116e759f73352fe03fee74aa999b293586737",
+  "act_type": "payments.refund_send",
+  "arguments": "arguments.json",
+  "cases": [
+    {
+      "checkpoint": "notes/b.cosigned",
+      "consistency_proof": null,
+      "expect": "ok",
+      "held": null,
+      "inclusion_proof": "proofs/inclusion-main-1-at-7.json",
+      "key_transition": null,
+      "lab_expect": "ok",
+      "name": "included-no-held",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/b.three-witnesses",
+      "consistency_proof": null,
+      "expect": "ok",
+      "held": null,
+      "inclusion_proof": "proofs/inclusion-main-1-at-7.json",
+      "key_transition": null,
+      "lab_expect": "ok",
+      "name": "included-three-witnesses",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/b.cosigned",
+      "consistency_proof": "proofs/consistency-3-7.json",
+      "expect": "ok",
+      "held": {
+        "root": "vX1RFFKiRnb279bwykftVy0s05z9ydtASwUGorAzVY0=",
+        "size": 3
+      },
+      "inclusion_proof": "proofs/inclusion-main-1-at-7.json",
+      "key_transition": null,
+      "lab_expect": "ok",
+      "name": "consistent-with-held",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/b.cosigned",
+      "consistency_proof": null,
+      "expect": "ok",
+      "held": {
+        "root": "KgFy66vCKi4B8DJ2K6E47RHm8RH9eOPT5drI3ScP/nw=",
+        "size": 7
+      },
+      "inclusion_proof": "proofs/inclusion-main-1-at-7.json",
+      "key_transition": null,
+      "lab_expect": "ok",
+      "name": "equal-to-held",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/c.cosigned",
+      "consistency_proof": "proofs/consistency-7-8.json",
+      "expect": "ok",
+      "held": {
+        "root": "KgFy66vCKi4B8DJ2K6E47RHm8RH9eOPT5drI3ScP/nw=",
+        "size": 7
+      },
+      "inclusion_proof": "proofs/inclusion-main-1-at-8.json",
+      "key_transition": "records/key-transition.json",
+      "lab_expect": "ok",
+      "name": "key-transition-followed",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/b.cosigned",
+      "consistency_proof": null,
+      "expect": "checkpoint_no_trusted_signature",
+      "held": null,
+      "inclusion_proof": "proofs/inclusion-main-1-at-7.json",
+      "key_transition": null,
+      "lab_expect": "checkpoint_no_trusted_signature",
+      "name": "wrong-log-key",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/wrong-log-key.policy"
+    },
+    {
+      "checkpoint": "notes/b.one-witness",
+      "consistency_proof": null,
+      "expect": "checkpoint_quorum_not_met",
+      "held": null,
+      "inclusion_proof": "proofs/inclusion-main-1-at-7.json",
+      "key_transition": null,
+      "lab_expect": "checkpoint_quorum_not_met",
+      "name": "too-few-cosignatures",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/b.outsider-and-one",
+      "consistency_proof": null,
+      "expect": "checkpoint_quorum_not_met",
+      "held": null,
+      "inclusion_proof": "proofs/inclusion-main-1-at-7.json",
+      "key_transition": null,
+      "lab_expect": "checkpoint_quorum_not_met",
+      "name": "unknown-witness",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/b.cosigned",
+      "consistency_proof": null,
+      "expect": "checkpoint_inclusion_invalid",
+      "held": null,
+      "inclusion_proof": "proofs/inclusion-main-1-at-7.json",
+      "key_transition": null,
+      "lab_expect": "checkpoint_inclusion_invalid",
+      "name": "tampered-leaf",
+      "record": "records/main-2.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/b.cosigned",
+      "consistency_proof": null,
+      "expect": "checkpoint_inclusion_invalid",
+      "held": null,
+      "inclusion_proof": "proofs/inclusion-main-1-at-7.index-moved.json",
+      "key_transition": null,
+      "lab_expect": "checkpoint_inclusion_invalid",
+      "name": "wrong-index",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/b.cosigned",
+      "consistency_proof": null,
+      "expect": "checkpoint_inclusion_invalid",
+      "held": null,
+      "inclusion_proof": "proofs/inclusion-main-1-at-7.truncated.json",
+      "key_transition": null,
+      "lab_expect": "checkpoint_inclusion_invalid",
+      "name": "truncated-proof",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/fork.cosigned",
+      "consistency_proof": "proofs/consistency-fork-3-7.json",
+      "expect": "checkpoint_consistency_invalid",
+      "held": {
+        "root": "vX1RFFKiRnb279bwykftVy0s05z9ydtASwUGorAzVY0=",
+        "size": 3
+      },
+      "inclusion_proof": "proofs/inclusion-fork-1-at-7.json",
+      "key_transition": null,
+      "lab_expect": "checkpoint_consistency_invalid",
+      "name": "inconsistent-newer",
+      "record": "records/fork-1.json",
+      "witness_policy": "policies/fork.policy"
+    },
+    {
+      "checkpoint": "notes/a.cosigned",
+      "consistency_proof": null,
+      "expect": "checkpoint_older_than_held",
+      "held": {
+        "root": "KgFy66vCKi4B8DJ2K6E47RHm8RH9eOPT5drI3ScP/nw=",
+        "size": 7
+      },
+      "inclusion_proof": "proofs/inclusion-main-1-at-3.json",
+      "key_transition": null,
+      "lab_expect": "checkpoint_older_than_held",
+      "name": "older-than-held",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/b.cosigned",
+      "consistency_proof": null,
+      "expect": "checkpoint_split_view_at_held_size",
+      "held": {
+        "root": "Q11VBA1wjUu0I+yftqg6gbALMSFP0AM4ldwD+IEB+PA=",
+        "size": 7
+      },
+      "inclusion_proof": "proofs/inclusion-main-1-at-7.json",
+      "key_transition": null,
+      "lab_expect": "checkpoint_split_view_at_held_size",
+      "name": "split-view-at-held-size",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/b.cosigned",
+      "consistency_proof": null,
+      "expect": "checkpoint_consistency_unproven",
+      "held": {
+        "root": "vX1RFFKiRnb279bwykftVy0s05z9ydtASwUGorAzVY0=",
+        "size": 3
+      },
+      "inclusion_proof": "proofs/inclusion-main-1-at-7.json",
+      "key_transition": null,
+      "lab_expect": "checkpoint_consistency_unproven",
+      "name": "larger-than-held-unproven",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/other-origin.relabelled",
+      "consistency_proof": null,
+      "expect": "checkpoint_origin_mismatch",
+      "held": null,
+      "inclusion_proof": "proofs/inclusion-other-1.json",
+      "key_transition": null,
+      "lab_expect": "checkpoint_origin_mismatch",
+      "name": "wrong-note-origin",
+      "record": "records/other-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/other-origin.log-note",
+      "consistency_proof": null,
+      "expect": "checkpoint_no_trusted_signature",
+      "held": null,
+      "inclusion_proof": "proofs/inclusion-other-1.json",
+      "key_transition": null,
+      "lab_expect": "checkpoint_no_trusted_signature",
+      "name": "other-origin-unrelabelled",
+      "record": "records/other-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/c.cosigned",
+      "consistency_proof": null,
+      "expect": "checkpoint_no_trusted_signature",
+      "held": null,
+      "inclusion_proof": "proofs/inclusion-main-1-at-8.json",
+      "key_transition": null,
+      "lab_expect": "checkpoint_no_trusted_signature",
+      "name": "key-transition-not-followed",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/c.cosigned",
+      "consistency_proof": null,
+      "expect": "checkpoint_transition_unendorsed",
+      "held": null,
+      "inclusion_proof": "proofs/inclusion-main-1-at-8.json",
+      "key_transition": "records/key-transition.json",
+      "lab_expect": "checkpoint_transition_unendorsed",
+      "name": "key-transition-unendorsed",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/wrong-log-key.policy"
+    },
+    {
+      "checkpoint": "notes/b.witness-line-changed",
+      "consistency_proof": null,
+      "expect": "checkpoint_signature_invalid",
+      "held": null,
+      "inclusion_proof": "proofs/inclusion-main-1-at-7.json",
+      "key_transition": null,
+      "lab_expect": "checkpoint_signature_invalid",
+      "name": "witness-line-changed",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/b.no-blank-line",
+      "consistency_proof": null,
+      "expect": "checkpoint_note_malformed",
+      "held": null,
+      "inclusion_proof": "proofs/inclusion-main-1-at-7.json",
+      "key_transition": null,
+      "lab_expect": "checkpoint_note_malformed",
+      "name": "note-without-blank-line",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/b.cosigned",
+      "consistency_proof": null,
+      "expect": "checkpoint_proof_malformed",
+      "held": null,
+      "inclusion_proof": "proofs/inclusion-main-1-at-7.size-changed.json",
+      "key_transition": null,
+      "lab_expect": "checkpoint_proof_malformed",
+      "name": "proof-size-changed",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/b.cosigned",
+      "consistency_proof": null,
+      "expect": "checkpoint_inclusion_invalid",
+      "held": null,
+      "inclusion_proof": "proofs/inclusion-main-1-at-7.other-leaf-hash.json",
+      "key_transition": null,
+      "lab_expect": "checkpoint_inclusion_invalid",
+      "name": "stated-leaf-hash-other",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/b.cosigned",
+      "consistency_proof": null,
+      "expect": "checkpoint_leaf_malformed",
+      "held": null,
+      "inclusion_proof": "proofs/inclusion-main-1-at-7.json",
+      "key_transition": null,
+      "lab_expect": "checkpoint_leaf_malformed",
+      "name": "cosignature-not-base64",
+      "record": "records/main-1.cosignature-not-base64.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/c.cosigned",
+      "consistency_proof": null,
+      "expect": "checkpoint_transition_unendorsed",
+      "held": null,
+      "inclusion_proof": "proofs/inclusion-main-1-at-8.json",
+      "key_transition": "records/key-transition.endorsement-changed.json",
+      "lab_expect": "checkpoint_transition_unendorsed",
+      "name": "key-transition-endorsement-changed",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/b.cosignature-time-over-max",
+      "consistency_proof": null,
+      "expect": "checkpoint_signature_invalid",
+      "held": null,
+      "inclusion_proof": "proofs/inclusion-main-1-at-7.json",
+      "key_transition": null,
+      "lab_expect": "checkpoint_signature_invalid",
+      "name": "cosignature-time-over-max",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/b.one-witness-twice",
+      "consistency_proof": null,
+      "expect": "checkpoint_note_malformed",
+      "held": null,
+      "inclusion_proof": "proofs/inclusion-main-1-at-7.json",
+      "key_transition": null,
+      "lab_expect": "checkpoint_note_malformed",
+      "name": "one-witness-twice",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/a.new-key",
+      "consistency_proof": null,
+      "expect": "checkpoint_before_transition",
+      "held": null,
+      "inclusion_proof": "proofs/inclusion-main-1-at-3.json",
+      "key_transition": "records/key-transition.json",
+      "lab_expect": "checkpoint_before_transition",
+      "name": "checkpoint-before-transition",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/fork.new-key",
+      "consistency_proof": null,
+      "expect": "checkpoint_transition_root_mismatch",
+      "held": null,
+      "inclusion_proof": "proofs/inclusion-fork-1-at-7.json",
+      "key_transition": "records/key-transition.json",
+      "lab_expect": "checkpoint_transition_root_mismatch",
+      "name": "transition-size-other-root",
+      "record": "records/fork-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/c.cosigned",
+      "consistency_proof": "proofs/consistency-7-8.json",
+      "expect": "ok",
+      "held": {
+        "root": "vX1RFFKiRnb279bwykftVy0s05z9ydtASwUGorAzVY0=",
+        "size": 3
+      },
+      "inclusion_proof": "proofs/inclusion-main-1-at-8.json",
+      "key_transition": "records/key-transition.json",
+      "lab_expect": "ok",
+      "name": "transition-held-older",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/c.cosigned",
+      "consistency_proof": "proofs/consistency-3-8.json",
+      "expect": "checkpoint_proof_malformed",
+      "held": {
+        "root": "vX1RFFKiRnb279bwykftVy0s05z9ydtASwUGorAzVY0=",
+        "size": 3
+      },
+      "inclusion_proof": "proofs/inclusion-main-1-at-8.json",
+      "key_transition": "records/key-transition.json",
+      "lab_expect": "checkpoint_proof_malformed",
+      "name": "transition-held-older-proof-from-held",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/main.policy"
+    },
+    {
+      "checkpoint": "notes/b.cosigned",
+      "consistency_proof": null,
+      "expect": "checkpoint_algorithm_unsupported",
+      "held": null,
+      "inclusion_proof": "proofs/inclusion-main-1-at-7.json",
+      "key_transition": null,
+      "lab_expect": "ok",
+      "name": "mldsa44-witness-named",
+      "record": "records/main-1.json",
+      "witness_policy": "policies/mldsa44-witness.policy"
+    }
+  ],
+  "registry": "lab-keys.json",
+  "schema": "requisition_checkpoint_vectors.v1"
+}

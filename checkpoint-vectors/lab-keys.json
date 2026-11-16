@@ -1,0 +1,16 @@
+{
+  "entries": [
+    {
+      "algorithm": "ed25519",
+      "key_id": "requisition_lab_dev_ed25519_v0",
+      "note": "a development key of the evaluation environment, made for the checkpoint vectors; not a trust root",
+      "public_key": "hPPCm2COefUfHH6h9yQ5gA+MP9dQBxOfHJG7MUmAWsc=",
+      "public_key_fingerprint": "beb5500cf59b13238905d7b6f1e59ea04bc76bbfadc01ff030350f121aaa899a",
+      "status": "active",
+      "status_changed_at": "2026-01-01T00:00:00Z",
+      "valid_from": "2026-01-01T00:00:00Z",
+      "valid_to": null
+    }
+  ],
+  "schema": "receipt_key_registry.v1"
+}

@@ -1,0 +1,9 @@
+{
+  "agent": "checkpoint-vectors",
+  "args": {
+    "amount_minor": 1250,
+    "currency": "USD",
+    "reason": "duplicate charge"
+  },
+  "tool": "refund_send"
+}

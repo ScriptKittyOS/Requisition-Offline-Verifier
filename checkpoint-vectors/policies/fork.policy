@@ -1,0 +1,5 @@
+log requisition-lab.invalid/checkpoint-vectors+f3ae0345+AYTzwptgjnn1Hxx+ofckOYAPjD/XUAcTnxyRuzFJgFrH
+witness w5 witness-5.invalid+daccda9e+BJbPzp9L/IbHPAiMCWuAuFcRuCD5YdqGwtgG2xGjDLJK
+witness w6 witness-6.invalid+47195f48+BCq1pbdA6yM6c6NDO1hYQ9XvzyVed9Rv/QwdqBCiYTkT
+group quorum-group 2 w5 w6
+quorum quorum-group

@@ -1,0 +1,7 @@
+{
+  "cosignature": "not base64!",
+  "key_id": "requisition_lab_dev_ed25519_v0",
+  "receipt_hash": "8b06739a7c50382a55548ad868a6684984d671dd16271387d169421407067eff",
+  "signature": "G8YUItnW5fTMx9kTzdGRofmzj8y/oD+y/utSiI9lVA+WQqhfe/bK/76hg3rz56kdE2b7GpbSniARlXZrj7uqCA==",
+  "signed_payload": "{\"chain_scope\":\"requisition-lab:account:4304a4a9-97f4-421e-8067-98248f84af9a\",\"metadata\":{\"act_hash\":\"b21d0cb4b0e92e2ca48437f4309e49cb9c607e3186a94ba3ec1480883de116e759f73352fe03fee74aa999b293586737\",\"act_hash_alg\":\"sha384+canonical_payload.v3\",\"act_type\":\"payments.refund_send\",\"hands\":\"one-person (G-301)\",\"key_id\":\"requisition_lab_dev_ed25519_v0\",\"n6_profile\":\"not_followed\",\"profile\":\"lab\",\"signer\":\"dev\",\"vector\":\"main-2\",\"verdict\":\"allow\"},\"occurred_at\":\"2026-11-16T20:30:09Z\",\"payload_hash\":null,\"previous_hash\":\"49998e1d7dc905d7a606d42c543b2aa9c827ce589d674fdb550f13e6929e6014\",\"receipt_type\":\"requisition.lab.decision.v0\",\"schema_version\":\"agent_receipt.v1\",\"sequence\":2,\"status\":\"recorded\",\"subject_id\":\"fd919023-f6fd-4bea-95af-a84469dd533b\",\"subject_type\":\"requisition.lab.statement\"}"
+}

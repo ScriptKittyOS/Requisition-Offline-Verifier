@@ -1,0 +1,11 @@
+{
+  "hash": "sha256",
+  "leaf_hash": "vMTuclwc9Qldvvmlc9rcU58KQJjsX5WCdP/XrxgSLBo=",
+  "leaf_index": 1,
+  "proof": [
+    "imAUeh4rnv9+fVefDltUTjwMjaxP6+DM9Ga7hUUyQ4Q=",
+    "U1CD2cuBGOawqCHxl4h1AMPut1bKzQjidlAZGrofBY8=",
+    "ssIORit5Q0aKSHQ9t4sSzID/wWMg2lnVf+m/MmvfF/s="
+  ],
+  "tree_size": 8
+}
