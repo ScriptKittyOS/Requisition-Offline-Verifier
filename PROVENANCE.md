@@ -49,7 +49,7 @@ that path was changed. Nothing else differs. The complete difference from the so
 ```
 
 Because the source files are otherwise unchanged, their comments and some output lines use the source trees' paths
-(`bin/lab-verify`, `bin/vendor/mldsa.py`, `bench/holytrinity-v2/verifier/CHECKPOINTS.md`), and `lab-verify` carries
+(`bin/lab-verify`, `bin/vendor/mldsa.py`), and `lab-verify` carries
 the project's reference `G-301` inside the two values of the signed `hands` label that it accepts.
 
 The table named commits `e3f9e732d291` (requisition) and `b8571e3e057f` (requisition-aws) for the files of
@@ -191,36 +191,38 @@ All three files
 
 - Each starts with the `SPDX-License-Identifier: Apache-2.0` line and the copyright line (as a convenience; see the
   licence section below).
-- Comments and docstrings were reworded: internal references were removed or replaced by a description.
-- Without the log checkpoint flags below, `verify.sh` prints the same output as with the files of 2026-11-15, equal to
+- Comments and docstrings were reworded; most internal references were removed or replaced by a description.
+- Without the flags of the evaluation environment's log checkpoint check (below), `verify.sh` prints the same output as with the files of 2026-11-15, equal to
   `expected-output.txt`, and `tamper-test.sh` the same output (measured).
 - `ed25519_verify` in `verify_receipt.py`, and `ed25519_key_acceptable` and `ed25519_signature_canonical` in
   `lab-verify`, are unchanged; `check_ed25519_material` in `lab-verify` differs only in its docstring (read in the
   code, by comparing the source text of each function).
 
-The log checkpoint check, in all three files. The flags `--checkpoint`, `--inclusion-proof`, `--witness-policy`,
+The log checkpoint check of the evaluation environment, in all three files. The flags `--checkpoint`, `--inclusion-proof`, `--witness-policy`,
 `--held-size`, `--held-root`, `--held-state`, `--write-held-state`, `--consistency-proof` and `--key-transition`
 check a record against a checkpoint of the evaluation environment's log. `verifier/CHECKPOINTS.md` and
-`CHECKPOINTS.md` state each check, input and refusal.
+`CHECKPOINTS.md` state each check of the evaluation environment's log, each input and each refusal.
 
-- `verify_receipt.py` judges the checkpoint after the receipt's own signature verified. A refusal exits 5 with a
-  `checkpoint_` code; a pass prints `log checkpoint:` lines after the receipt's verdict. The file of 2026-11-15 skipped
+- `verify_receipt.py` judges the evaluation environment's checkpoint after the receipt's own signature verified. A refusal exits 5 with a
+  `checkpoint_` code, and a pass prints the `log checkpoint:` lines of the evaluation environment's checkpoint after
+  the receipt's verdict. The file of 2026-11-15 skipped
   these flags without a word: given `--checkpoint`, it answered exit 0 for a valid receipt and said nothing of the
-  log (measured on `checkpoint-vectors/records/main-1.json`).
+  evaluation environment's log (measured on `checkpoint-vectors/records/main-1.json`).
 - `lab-verify` hands the flags to `verify_receipt.py` on the Ed25519 path and passes its refusals through. On its
-  exit 0 it requires the line `log checkpoint: all checks held: ...`, else exit 5, `lab_verifier_unavailable` (read
-  in the code). On the ML-DSA-87 path the flags are refused, exit 5, `lab_checkpoint_unchecked_mldsa87` (read in the
-  code). A flag given twice is a usage error, exit 2 (measured). The file of 2026-11-15 refused the flags as unknown
+  exit 0 it requires the line `log checkpoint: all checks held: ...`, which says that every check of the evaluation
+  environment's checkpoint held, else exit 5, `lab_verifier_unavailable` (read
+  in the code). On the ML-DSA-87 path (a record of the evaluation environment whose own signature is ML-DSA-87) the
+  flags are refused, exit 5, `lab_checkpoint_unchecked_mldsa87` (read in the code). A flag given twice is a usage error, exit 2 (measured). The file of 2026-11-15 refused the flags as unknown
   arguments, exit 2 (measured).
-- `verify_offline.py` hands the flags to `lab-verify`, with the co-signature beside the record. A checkpoint refusal
-  ends `verdict: FAIL (the log checkpoint: <code>)`, exit 6; a pass adds a section 4 with the `log checkpoint:` lines
+- `verify_offline.py` hands the flags to `lab-verify`, with the co-signature beside the record. A refusal of the
+  evaluation environment's checkpoint ends `verdict: FAIL (the log checkpoint: <code>)`, exit 6; a pass adds a section 4 with the `log checkpoint:` lines
   and one sentence to the PASS line (measured over the 32 cases of `checkpoint-vectors/`, see below). A usage error
   that `lab-verify` reports for these inputs is exit 2 (read in the code). The file of 2026-11-15 refused the flags as
   a usage error, exit 2 (measured).
 
 `verifier/lab-verify`
 
-- The signed `hands` label may carry either of two values, `one-person (G-301)` and `two-account, two-passkey
+- The signed `hands` label of a record of the evaluation environment may carry either of two values, `one-person (G-301)` and `two-account, two-passkey
   (G-301)`; any other value is refused as before, exit 1, `lab_label_missing`, and the message lists the two values.
   A record signed with the second value must carry two distinct `sanctioners` and two distinct `approval_records`,
   else exit 1, `lab_hands_unsupported`; when it passes, its answer adds a line saying what that value rests on and
@@ -235,11 +237,11 @@ check a record against a checkpoint of the evaluation environment's log. `verifi
 - Its second encoder, `canonical_payload.v4`, which it does not use to verify a record, refuses the integer `-0` as
   `negative_zero` (read in the code).
 
-## The log checkpoint check: its documents, its test and its vectors
+## The evaluation environment's log checkpoint check: its documents, its test and its vectors
 
 Added on 2026-11-16.
 
-| File | Source | Source commit | SHA-256 | Changes |
+| Document on the evaluation environment's log checkpoint check | Source | Source commit | SHA-256 | Changes |
 |---|---|---|---|---|
 | `CHECKPOINTS.md` | `CHECKPOINTS.md` (requisition-aws) | `13f7729fcce3` | `5701a24e725d8bba31c458c6499b63b83983d5ea94a98c186acc1d86c68b02a3` | none |
 | `verifier/CHECKPOINTS.md` | `bench/holytrinity-v2/verifier/CHECKPOINTS.md` (requisition) | `61e49fea9938` | `5a5645d8f31bcf2b724c0a6350b2fc77a2f123cb11a6f600693d7f64c9303039` | none |
@@ -248,16 +250,19 @@ The two documents are copied unchanged, so they name places in their source tree
 
 - `bin/lab-verify` is `verifier/lab-verify`; requisition-aws's `bin/verify_offline.py` is `verifier/verify_offline.py`;
   `bench/holytrinity-v2/verifier/` is `verifier/`.
-- `verifier/CHECKPOINTS.md` also describes `verify_receipt.exs` and `verify_receipt_checkpoint.exs`, the Elixir
+- For the evaluation environment's log, `verifier/CHECKPOINTS.md` also describes `verify_receipt.exs` and `verify_receipt_checkpoint.exs`, the Elixir
   verifier of the source tree, and `CHECKPOINTS.md` names `bin/verify_chain.py`; none of the three is in this
   repository.
-- `lab/checkpoint-vectors/` of the Requisition repository is `checkpoint-vectors/` here, without its provenance note.
-  `verifier/CHECKPOINTS.md` says that folder holds 26 cases; at the source commit it holds 32, and so does
+- `lab/checkpoint-vectors/` of the Requisition repository, the evaluation environment's vectors, is
+  `checkpoint-vectors/` here, without its provenance note.
+  `verifier/CHECKPOINTS.md` says that folder of the evaluation environment's vectors holds 26 cases; at the source commit it holds 32, and so does
   `checkpoint-vectors/manifest.json` (measured). "The tests run all four verifiers" refers to the source tree's
-  tests; here `checkpoint-test.sh` runs `verifier/verify_offline.py`, which runs the other two Python files.
+  tests; here `checkpoint-test.sh` runs `verifier/verify_offline.py`, which runs the other two Python files, over the evaluation
+  environment's vectors.
 
-`checkpoint-test.sh` was written for this repository. It runs `verifier/verify_offline.py` with the checkpoint flags
-of each case in `checkpoint-vectors/manifest.json` and compares the answer with the case's `expect`: exit 0 and the
+`checkpoint-test.sh`, which runs the check over the evaluation environment's vectors, was written for this
+repository. It runs `verifier/verify_offline.py` with the checkpoint flags of each case of the evaluation environment
+in `checkpoint-vectors/manifest.json` and compares the answer with the case's `expect`: exit 0 and the
 PASS line's checkpoint sentence for `ok`, exit 6 and `verdict: FAIL (the log checkpoint: <code>)` for a refusal.
 
 The vectors were made by the evaluation environment's own code, in one test run: the records by its signing path
@@ -267,13 +272,13 @@ inclusion and consistency proofs by its read routes; the forked history by the s
 records. Each negative case changes the producer's bytes in one stated way. The manifest's `expect` is the verdict
 every offline verifier must give, and `lab_expect` the evaluation environment's own judgement; they differ in one
 case, a policy naming an ML-DSA-44 witness, which the evaluation environment reads and these verifiers refuse by
-name. None of these records is a 13 November record, and their key is not one of the AWS KMS keys in
-`record/public-keys.json`. (Read in the source folder's provenance note.)
+name. None of these records is a 13 November record, and their key is not one of the AWS KMS keys of the
+evaluation environment in `record/public-keys.json`. (Read in the source folder's provenance note.)
 
-Each file is byte-equal to the file of the same name under `lab/checkpoint-vectors/` of requisition at
+Each vector file of the evaluation environment is byte-equal to the file of the same name under `lab/checkpoint-vectors/` of requisition at
 `61e49fea9938` (measured, by SHA-256):
 
-| File | Source path (requisition) | SHA-256 |
+| Vector file of the evaluation environment | Source path (requisition) | SHA-256 |
 |---|---|---|
 | `checkpoint-vectors/arguments.json` | `lab/checkpoint-vectors/arguments.json` | `af1566902a162074748d1b8901ab241e9191425177848f3dc6fd2beeaf3f1aa9` |
 | `checkpoint-vectors/lab-keys.json` | `lab/checkpoint-vectors/lab-keys.json` | `8983c19a52187ab93b57937cfe1f120cefec07325bd1b0e953572a81e1307b46` |
@@ -373,10 +378,10 @@ For the files of 2026-11-16 (the tables above), measured on that date:
 - `sh verify.sh` exits 0 and its output equals `expected-output.txt`, on Python 3.11.15 and 3.12.3, in an empty
   environment (`env -i`).
 - `sh tamper-test.sh` exits 0, with the same output as with the files of 2026-11-15.
-- `sh checkpoint-test.sh` exits 0: 32 cases, 6 pass and 26 are refused by name, each as the manifest expects, on
+- `sh checkpoint-test.sh` exits 0: 32 cases of the evaluation environment, 6 pass and 26 are refused by name, each as the manifest expects, on
   Python 3.11.15 and 3.12.3, with the same output on both.
-- A system-call trace (`strace -f -e trace=network`) of `sh verify.sh`, and one of `sh checkpoint-test.sh`, shows no
-  network system calls.
+- A system-call trace (`strace -f -e trace=network`) of `sh verify.sh`, and one of `sh checkpoint-test.sh` over the
+  evaluation environment's vectors, shows no network system calls.
 - `python3 -B -I tools/check-licence.py` passes.
 
 ## The licence from the next release (Apache License 2.0)

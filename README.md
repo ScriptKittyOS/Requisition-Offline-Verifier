@@ -228,7 +228,7 @@ Earlier releases keep the licence they were published under: v0.1.0 is under the
 
 The vendored ML-DSA library keeps its own licence: [`verifier/vendor/LICENSE.mldsa`](verifier/vendor/LICENSE.mldsa).
 
-The test vectors in `interop/vectors/` keep their own licences: [`LICENSE.nist-acvp-server`](interop/vectors/LICENSE.nist-acvp-server) for the NIST ACVP file and [`LICENSE.wycheproof`](interop/vectors/LICENSE.wycheproof) for the Wycheproof file. [`THIRD-PARTY.md`](THIRD-PARTY.md) lists every file that keeps its own licence.
+The test vectors in `interop/vectors/` keep their own licences: [`LICENSE.nist-acvp-server`](interop/vectors/LICENSE.nist-acvp-server) for the NIST ACVP file and [`LICENSE.wycheproof`](interop/vectors/LICENSE.wycheproof) for the Wycheproof file. [`THIRD-PARTY.md`](THIRD-PARTY.md) lists the files that keep their own licences.
 
 The release tag v0.1.0 is signed; [Signed releases](PROVENANCE.md#signed-releases) says how to check a release tag and which key signs it.
 
