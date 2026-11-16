@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 """mldsa-py 1.0.1 (the file this repository vendors as verifier/vendor/mldsa.py) over a cases file.
 
 usage: python3 -B -I verify.py CASES.tsv

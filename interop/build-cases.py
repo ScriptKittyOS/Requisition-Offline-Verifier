@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 """Derive interop/cases.tsv from this repository's record and the two test-vector files.
 
 usage: build-cases.py [--check]

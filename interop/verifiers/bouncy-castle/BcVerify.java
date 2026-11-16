@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 // Runs a cases file through Bouncy Castle's lightweight ML-DSA verifier (ML-DSA-87, pure).
 // usage: java -cp BCPROV.jar BcVerify.java CASES.tsv
 // Prints one result line. Exit 0 when no case disagrees with its expected result, 1 when any does, 2 on bad input.

@@ -2,9 +2,20 @@
 
 - Library: pyca/cryptography 50.0.2, its ML-DSA-87 interface (`cryptography.hazmat.primitives.asymmetric.mldsa`).
   The measured installation used OpenSSL 4.0.3 (29 Sep 2026), as the result line reports.
-- Where to get it: the `cryptography` project on PyPI, version 50.0.2 (`pip install cryptography==50.0.2` into a
-  virtual environment). Check that the installed package reports the version in the result line. The harness
-  prints the version and OpenSSL it ran on, so a different installation is visible in the output.
+- Where to get it: the `cryptography` project on PyPI, version 50.0.2, with `cffi` 2.1.1 and `pycparser` 3.12, each
+  pinned by version and SHA-256 in `requirements.txt` here. Install them into a new virtual environment
+  (`WORK` is any empty folder); pip refuses any file whose SHA-256 is not listed:
+
+  ```
+  python3 -m venv "$WORK/pyca"
+  "$WORK/pyca/bin/pip" install --require-hashes --only-binary=:all: -r interop/verifiers/pyca-cryptography/requirements.txt
+  ```
+
+  `PYCA_PYTHON` is then `$WORK/pyca/bin/python`. The harness prints the version and OpenSSL it ran on, so a
+  different installation is visible in the output.
+- Where the hashes came from: the SHA-256 digests PyPI's index lists for each file of those three versions, copied
+  from a lock file made from that index. PyPI serves the files and the digests over the same HTTPS connection, so
+  the digests show that a file is the one PyPI listed, not who built it.
 - This library and Erlang/OTP both call OpenSSL: see `interop/README.md`.
 
 Run, from the top of this repository. `PYCA_PYTHON` is the Python program of an environment in which the package is

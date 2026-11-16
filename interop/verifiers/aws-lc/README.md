@@ -7,6 +7,9 @@
   `8895a9d2434e875e009e652a1015f9c2c275261634c7132253ca5aa60d266888` (release page
   https://github.com/aws/aws-lc/releases/tag/v5.14.0). GitHub generates this archive on request; if GitHub
   regenerates it, its SHA-256 can differ from the one recorded here.
+- Where the hash came from: it was computed over the archive downloaded on 2026-11-14 for the measured run. The
+  project's release, as read that day, lists no SHA-256 for this generated archive, so the digest shows only that your
+  archive is the one that was measured.
 - Measured with gcc 13.3.0 (Ubuntu 13.3.0-6ubuntu2~24.04.1), cmake 3.28.3, GNU Make 4.3, Linux x86-64.
 - Limit: the harness refuses a context longer than 255 bytes before calling the library (5 of the 260 cases; all
   expect rejection). Without that check the harness also printed 0 disagreements (measured 2026-11-14), so the

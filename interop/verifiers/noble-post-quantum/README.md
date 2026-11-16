@@ -1,9 +1,21 @@
 # @noble/post-quantum
 
 - Library: @noble/post-quantum 0.7.1 (JavaScript), `ml_dsa87.verify`. Measured on Node v22.23.2.
-- Where to get it: the npm package `@noble/post-quantum`, version 0.7.1
-  (`npm install @noble/post-quantum@0.7.1` in an empty folder). Check the version in the result line.
+- Where to get it: the npm package `@noble/post-quantum`, version 0.7.1, and the three packages it needs
+  (`@noble/ciphers`, `@noble/curves`, `@noble/hashes`, each 2.4.0), each pinned by version and SHA-512 in
+  `package-lock.json` here. Copy `package.json` and `package-lock.json` into an empty folder and install there;
+  `npm ci` refuses a package whose SHA-512 differs from the lock file and runs no install script:
+
+  ```
+  cp interop/verifiers/noble-post-quantum/package.json interop/verifiers/noble-post-quantum/package-lock.json "$NOBLE_DIR"/
+  (cd "$NOBLE_DIR" && npm ci --ignore-scripts)
+  ```
+
+  Check the version in the result line.
 - `NOBLE_DIR` is that folder: it holds a `package.json` and `node_modules/@noble/post-quantum`.
+- Where the hashes came from: the `integrity` values the npm registry gave for these four versions, copied from a
+  lock file made from the registry. The registry serves the packages and these values over the same HTTPS connection, so
+  they show that the files are the ones the registry listed, not who built them.
 
 Run, from the top of this repository:
 

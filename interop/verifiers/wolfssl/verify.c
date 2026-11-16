@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 /* wolfCrypt ML-DSA-87 (pure, external interface) over a cases file. usage: verify CASES.tsv
  * Prints one result line. Exit 0 when no case disagrees with its expected result, 1 when any does, 2 on bad input. */
 #include <wolfssl/options.h>

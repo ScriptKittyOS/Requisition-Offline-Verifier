@@ -1,0 +1,10 @@
+{
+  "name": "noble-post-quantum-harness",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "Installs @noble/post-quantum 0.7.1 for interop/verifiers/noble-post-quantum/verify.mjs; npm ci checks each package against the sha512 in package-lock.json.",
+  "dependencies": {
+    "@noble/post-quantum": "0.7.1"
+  }
+}

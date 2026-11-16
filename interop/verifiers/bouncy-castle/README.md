@@ -4,6 +4,12 @@
   21.0.13.0.3.
 - Where to get it: Maven Central, `org.bouncycastle:bcprov-jdk18on:1.87`, file `bcprov-jdk18on-1.87.jar`,
   SHA-256 `12d2d3dd82a9ec15e92ec7c7943ee64f6097c6dc12c07e984f1693b77565b9aa`. `BC_JAR` is the path of that file.
+  `interop/run-all.sh` runs the jar only when its SHA-256 is that value; otherwise it reports an error for this
+  verifier and exits 1.
+- Where the hash came from: the `bcprov-jdk18on-1.87.jar.sha256` file Maven Central publishes beside the jar, read
+  on 2026-11-14; the jar downloaded that day has that digest (and the SHA-1 in Maven Central's `.sha1` file). Maven
+  Central serves the jar and its digest files from the same place, so the digest shows that the jar is the one
+  Maven Central holds, not who built it; the Bouncy Castle project's OpenPGP signature (`.asc`) was not checked.
 - The harness is a single source file that `java` compiles and runs itself (measured with Java 21);
   nothing is written into this repository.
 

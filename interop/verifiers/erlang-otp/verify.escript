@@ -1,4 +1,6 @@
 #!/usr/bin/env escript
+%% SPDX-License-Identifier: Apache-2.0
+%% Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 %% Erlang/OTP :crypto (OpenSSL) over a cases file. usage: escript verify.escript CASES.tsv
 %% OTP's :crypto takes no ML-DSA context argument, so only the cases with the EMPTY context are run; the others
 %% are counted as not run. Exit 0 when no case that ran disagrees with its expected result, 1 when any does,

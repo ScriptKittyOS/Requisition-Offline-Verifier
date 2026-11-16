@@ -6,7 +6,9 @@
   `mldsa87`, exited 3 and said so on standard error; it does not count the cases as disagreements.
 - Where to get it: Erlang/OTP source releases are at https://www.erlang.org/ . Build or install OTP 28 so that its
   `crypto` application uses OpenSSL 3.5 or later. No checksum was recorded for the measured OTP
-  build; the result line reports the OTP release and the OpenSSL version it runs on.
+  build, so this repository pins no hash for it: check the source archive you download against the checksum the
+  Erlang/OTP project publishes for that release before building it. The result line reports the OTP release and the
+  OpenSSL version it runs on.
 - This library and pyca/cryptography both call OpenSSL: see `interop/README.md`.
 - Limit: `crypto:verify/5` has no context argument, so only the 239 cases with the empty context are run. The 21
   cases that have a context are counted as not run, and the line says so.

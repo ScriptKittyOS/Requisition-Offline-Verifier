@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 """pyca/cryptography (ML-DSA-87 through its OpenSSL backend) over a cases file.
 
 usage: python3 -B -I verify.py CASES.tsv

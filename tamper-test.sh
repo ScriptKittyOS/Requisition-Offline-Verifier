@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 # Negative tests. Each case copies this folder, changes one thing, and expects verify.sh to FAIL.
 # Offline. Leaves this folder untouched; works in a temporary directory that is removed at the end.
 # Usage: sh tamper-test.sh        Exit status 0 only if the untouched copy passes and every tampered copy fails.

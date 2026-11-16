@@ -5,6 +5,10 @@
   https://github.com/wolfSSL/wolfssl/archive/refs/tags/v5.9.4-stable.tar.gz , saved as
   `wolfssl-5.9.4-stable.tar.gz`, SHA-256 `7256bfc89b183a75183806c7debfa203443873b0b4a562e1b80d68e01b45ac57`.
   GitHub generates this archive on request; if GitHub regenerates it, its SHA-256 can differ from the one recorded here.
+- Where the hash came from: it was computed over the archive downloaded on 2026-11-14 for the measured run. The
+  project's release, as read that day, lists no SHA-256 for this generated archive, so the digest shows only that your
+  archive is the one that was measured. The release lists an OpenPGP signature for it
+  (`wolfssl-5.9.4-stable.tar.gz.asc`); it was not checked.
 - Measured with gcc 13.3.0 (Ubuntu 13.3.0-6ubuntu2~24.04.1), cmake 3.28.3, GNU Make 4.3, Linux x86-64.
 - Limit: the context length argument of `wc_MlDsaKey_VerifyCtx` is one byte, so a context over 255 bytes cannot be
   passed. The harness refuses those before the call (5 of the 260 cases; all expect rejection); the library was not

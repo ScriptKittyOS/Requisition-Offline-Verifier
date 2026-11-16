@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 // Runs a cases file through the Go standard library's crypto/mldsa (ML-DSA-87, pure, external interface).
 // usage: go run . CASES.tsv
 // Prints one result line. Exit 0 when no case disagrees with its expected result, 1 when any does, 2 on bad input.

@@ -1,0 +1,10 @@
+Requisition Offline Verifier
+Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
+
+Licensed under the Apache License, Version 2.0 (the "License"); see the file LICENSE. Releases up to and including
+v0.1.0 were published under the Requisition-Offline-Verifier Verification Licence 1.0 and remain under it.
+
+This repository also contains third-party files under their own licences, listed in THIRD-PARTY.md.
+The ML-DSA-87 test vectors in interop/vectors/acvp_sigver_mldsa87_pure_external.json come from the National
+Institute of Standards and Technology (NIST), ACVP-Server release v1.1.0.43; the file is a subset of the upstream
+file, as interop/vectors/PROVENANCE.md describes.

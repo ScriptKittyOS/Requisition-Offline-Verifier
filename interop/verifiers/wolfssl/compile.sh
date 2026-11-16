@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 # usage: compile.sh WOLFSSL_PREFIX OUTPUT_FILE
 # WOLFSSL_PREFIX is the install folder of a wolfSSL build (it holds include/ and lib/libwolfssl.a).
 set -eu

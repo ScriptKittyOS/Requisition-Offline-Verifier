@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 # usage: compile.sh BOTAN_PREFIX OUTPUT_FILE
 # BOTAN_PREFIX is the install folder of a Botan build (it holds include/botan-3/ and lib/libbotan-3.a).
 set -eu

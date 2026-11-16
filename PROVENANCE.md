@@ -224,3 +224,30 @@ For the files of 2026-11-15 (the table above), measured on that date:
   `ed25519_signature_canonical` of `verifier/lab-verify` answer the same on all 102 inputs as in v0.1.0. The inputs
   were given to these functions directly; the 95 of them that the review also ran through the command line were not
   run again.
+
+## The licence from the next release (Apache License 2.0)
+
+Releases up to and including v0.1.0 were published under the Requisition-Offline-Verifier Verification Licence 1.0,
+and they stay under it: that text is `LICENSE` at the tag v0.1.0. From the next release, this repository is licensed
+under the Apache License 2.0:
+
+- `LICENSE` is the Apache License 2.0 text, 11,358 bytes, SHA-256
+  `cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30`.
+- `NOTICE` names the copyright holder and the NIST source of the ACVP vectors; `THIRD-PARTY.md` lists the files
+  that keep their own licences. The Apache License does not require either file of this repository; they are kept
+  so that the copyright holder and the third-party licences are stated in one place.
+- Each source file written for this repository starts with an `SPDX-License-Identifier: Apache-2.0` line and the
+  copyright line, as a convenience for readers and tools; the licence does not require them.
+  `python3 -B -I tools/check-licence.py` checks the licence text, the NOTICE, those headers, and that the
+  interop downloads are pinned by hash.
+- The interop harnesses' downloads are pinned: `interop/verifiers/pyca-cryptography/requirements.txt` (pip, by
+  SHA-256), `interop/verifiers/noble-post-quantum/package-lock.json` (npm, by SHA-512), and the Bouncy Castle jar by
+  SHA-256 in `interop/run-all.sh`. Each harness's README says where its digest came from.
+
+## Signed releases
+
+The commits and release tags of this repository are signed with the OpenPGP key of Ayla Croft, fingerprint
+`24FE 4F05 E3E8 EC26 1462  A0C7 82A6 7035 D628 7F15`. The public key is published independently at
+`https://github.com/HackTuah.gpg`, Ayla Croft's GitHub account. Check a release with `git verify-tag <tag>`, and
+check that the fingerprint git reports matches both the one above and the key at that address. A fingerprint read
+only from this file or this repository does not show who signed it.

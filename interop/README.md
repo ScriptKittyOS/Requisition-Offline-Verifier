@@ -21,8 +21,9 @@ answer differed from the expected answer.
 | wolfSSL | 5.9.4 | C, gcc 13.3.0 | 260 | 0 disagree | 2026-11-14 | Linux x86-64 |
 | Botan | 3.14.1 | C++, g++ 13.3.0 | 260 | 0 disagree | 2026-11-14 | Linux x86-64 |
 
-The exact result line of each program is in its folder, `verifiers/<name>/README.md`, with where to get the library
-(and its SHA-256 where one was recorded), the commands that build and run it, and the line it should print.
+The exact result line of each program is in its folder, `verifiers/<name>/README.md`, with where to get the library,
+its SHA-256 (or, for npm, its SHA-512) and where that digest came from, the commands that check it, build and run
+it, and the line it should print. Erlang/OTP is the one library without a recorded digest.
 
 ## The cases
 

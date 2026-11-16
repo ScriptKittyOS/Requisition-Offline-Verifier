@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 # usage: compile.sh AWSLC_PREFIX OUTPUT_FILE
 # AWSLC_PREFIX is the install folder of an AWS-LC build (it holds include/ and lib/libcrypto.a).
 set -eu

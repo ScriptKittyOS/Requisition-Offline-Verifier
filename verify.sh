@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 # Verifies the signed statement and the signed decision in record/. Offline: opens no network connection.
 # Usage: sh verify.sh        Exit status 0 only if both records pass.
 set -u

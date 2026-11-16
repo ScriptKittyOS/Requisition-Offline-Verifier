@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 // @noble/post-quantum ML-DSA-87 over a cases file.
 // usage: node verify.mjs CASES.tsv NOBLE_DIR
 //   NOBLE_DIR is a folder with a package.json beside a node_modules that holds @noble/post-quantum.

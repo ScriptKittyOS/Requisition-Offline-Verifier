@@ -1,11 +1,13 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 # Runs every verifier whose tool it finds over interop/cases.tsv and prints one line each.
 # Tools are found through the environment variables named in interop/verifiers/*/README.md:
 #   PYCA_PYTHON     a Python 3 with pyca/cryptography (with ML-DSA support) installed
 #   OTP_ESCRIPT     the escript program of an Erlang/OTP 28 built on OpenSSL 3.5 or later
 #   NOBLE_DIR       a folder holding package.json and node_modules/@noble/post-quantum   (and `node` on PATH)
 #   GO_BIN          the go program of Go 1.27 or later
-#   BC_JAR          a bcprov-jdk18on jar, version 1.87 or later                            (and `java` 21 on PATH)
+#   BC_JAR          the bcprov-jdk18on 1.87 jar, checked against BC_JAR_SHA256 below before use (and `java` 21 on PATH)
 #   AWSLC_PREFIX, WOLFSSL_PREFIX, BOTAN_PREFIX   the install folder of a build of the library
 #   AWSLC_VERIFY, WOLFSSL_VERIFY, BOTAN_VERIFY   (instead of a prefix) a harness already compiled by the
 #                                                verifier's compile.sh
@@ -71,8 +73,20 @@ if [ -n "${GO_BIN:-}" ] && [ -x "$GO_BIN" ]; then
   run go-crypto-mldsa sh -c 'cd "$1" && exec "$2" run . "$3"' sh "$here/verifiers/go-crypto-mldsa" "$GO_BIN" "$cases"
 else skip go-crypto-mldsa "GO_BIN is not set to a go program"; fi
 
+# The jar is run only when its SHA-256 is the pinned one (its source: interop/verifiers/bouncy-castle/README.md).
+BC_JAR_SHA256=12d2d3dd82a9ec15e92ec7c7943ee64f6097c6dc12c07e984f1693b77565b9aa
+sha256_of() { # prints the SHA-256 of one file, with sha256sum or (macOS) shasum
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum < "$1" | cut -c1-64
+  else shasum -a 256 < "$1" | cut -c1-64; fi
+}
 if [ -n "${BC_JAR:-}" ] && [ -f "$BC_JAR" ] && command -v java >/dev/null 2>&1; then
-  run bouncy-castle java -cp "$BC_JAR" "$here/verifiers/bouncy-castle/BcVerify.java" "$cases"
+  got=$(sha256_of "$BC_JAR")
+  if [ "$got" = "$BC_JAR_SHA256" ]; then
+    run bouncy-castle java -cp "$BC_JAR" "$here/verifiers/bouncy-castle/BcVerify.java" "$cases"
+  else
+    ran=$((ran + 1)); bad=$((bad + 1))
+    printf 'bouncy-castle: FAILED to run: BC_JAR has SHA-256 %s, not the pinned %s\n' "$got" "$BC_JAR_SHA256"
+  fi
 else skip bouncy-castle "BC_JAR is not set to a jar file, or java is not on PATH"; fi
 
 cverifier aws-lc AWSLC_PREFIX AWSLC_VERIFY

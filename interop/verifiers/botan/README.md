@@ -4,6 +4,9 @@
   the context is set with `PK_Signature_Options::with_context`.
 - Where to get it: the Botan 3.14.1 source release from the project's download page, https://botan.randombit.net/ ,
   file `Botan-3.14.1.tar.xz`, SHA-256 `5b85cba0f014d344eb8e9919aee0a3bdc31e16acb05816410025be9bee1e0930`.
+- Where the hash came from: the line for this file in the `sha256sums.txt` the Botan project publishes on the same
+  download site, read on 2026-11-14; the archive downloaded that day has that digest. The project's OpenPGP
+  signature over the archive was not checked.
 - Measured with g++ 13.3.0 (Ubuntu 13.3.0-6ubuntu2~24.04.1), GNU Make 4.3, Python 3.12.3 (for Botan's
   `configure.py`), Linux x86-64.
 - Contexts: all 21 cases with a context are passed to the library, including the 5 over 255 bytes. The harness

@@ -2,7 +2,15 @@
 
 - Library: `crypto/mldsa` of the Go standard library, Go 1.27.4 (`mldsa.NewPublicKey`, `mldsa.Verify`).
 - Where to get it: the Go download page, https://go.dev/dl/ , file `go1.27.4.linux-amd64.tar.gz`,
-  SHA-256 `7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840`. Unpack it; `GO_BIN` is its `bin/go`.
+  SHA-256 `7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840`. Check it, then unpack it (`GO_TARBALL`
+  is the downloaded file, `WORK` any empty folder); `GO_BIN` is then `$WORK/go/bin/go`:
+
+  ```
+  echo "7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840  $GO_TARBALL" | sha256sum -c -
+  tar -xzf "$GO_TARBALL" -C "$WORK"
+  ```
+- Where the hash came from: the `sha256` the Go project lists for this file in its download index
+  (`https://go.dev/dl/?mode=json&include=all`), read on 2026-11-14; the file downloaded that day has that digest.
 - The harness has no dependencies outside the standard library, so no module download is needed.
 
 Run, from the top of this repository. The environment variables stop Go downloading anything and keep its caches
