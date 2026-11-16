@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 """verify_receipt.py — check a Trinity authority receipt's Ed25519 signature.
 
     python3 verify_receipt.py --receipt RECEIPT.json --registry REGISTRY.json
+        [--checkpoint NOTE --inclusion-proof PROOF.json --witness-policy POLICY
+         [--held-size N --held-root ROOT | --held-state FILE [--write-held-state]]
+         [--consistency-proof PROOF.json] [--key-transition RECORD.json]]
 
 Python standard library only. No pip installs, no network. Tested with Python 3.11 and 3.12.
 
@@ -51,6 +56,12 @@ VERDICT CODES. Every exit-1 and exit-5 message this file writes ends with a line
 `verdict_code: <code>`, the same code verify_receipt.exs and the issuing system name for that
 input, written to STDERR with the message. The cross-check test compares the codes, not only the
 exits, on every corpus row. Exit 0, 2 and 6 carry no code.
+
+LOG CHECKPOINTS. With --checkpoint, a receipt that VERIFIED is also checked against a checkpoint of
+the evaluation environment's transparency log: its inclusion under a checkpoint signed by the log key
+and cosigned by the witnesses the relying party's policy names, and that the checkpoint is not older
+than the tree the relying party holds. CHECKPOINTS.md, beside this file, states the checks, the
+inputs, every refusal and what is not checked; the code is the section of that name below.
 
 NO INPUT ENDS IN A STACK TRACE. A runtime that dies on an uncaught exception exits 1, which
 VERDICTS.md reserves for "the receipt is bad", and writes no code line. So every named member of the
@@ -448,6 +459,488 @@ def tagged(value):
     return ("other", repr(value))
 
 
+# --- THE LOG CHECKPOINT CHECKS (CHECKPOINTS.md, beside this file) --------------------------------
+# Run only when --checkpoint is given, and only after the receipt itself VERIFIED (exit 0): an
+# answer about the log needs a receipt whose signature checked out. Three checks, in this order:
+#
+#   (1) INCLUSION. The relying party's witness policy (--witness-policy, its own file; the format of
+#       C2SP tlog-witness policies: "log <vkey>", "witness <name> <vkey>", "group <name> <N|any|all>
+#       <member>...", "quorum <name|none>") names the log key and the witnesses. The checkpoint
+#       (--checkpoint, a C2SP signed note) must carry a verifying line of every log key, under the
+#       note's own origin, and cosignatures (C2SP tlog-cosignature, Ed25519 type 0x04) that meet the
+#       policy's quorum. The receipt's leaf, "requisition.lab.log.leaf.v1\n" || u32be(|P|) || P ||
+#       u16be(|S|) || S || u16be(|C|) || C (P the signed bytes, S the signature, C the co-signature,
+#       empty when absent), must be included under the checkpoint's SHA-256 root by the RFC 9162
+#       inclusion proof given (--inclusion-proof).
+#   (2) CONSISTENCY and (3) NOT OLDER THAN THE HELD SIZE. The relying party passes the largest tree
+#       size it already holds and that tree's root (--held-size and --held-root, or a held-state
+#       file it keeps, --held-state). A checkpoint smaller than that is refused
+#       (checkpoint_older_than_held); one of that size with another root is refused
+#       (checkpoint_split_view_at_held_size); a larger one needs an RFC 9162 consistency proof from
+#       the held tree (--consistency-proof) that verifies. This proves membership and append-only
+#       growth between the trees the relying party holds and the checkpoint given, no more: that
+#       no larger tree exists is not something a checkpoint can show.
+#
+# A key change of the log is followed only through the log's own signed key-transition record
+# (--key-transition): the old key, named in the policy, endorses the new one. Every refusal exits 5
+# (TRUST NOT ESTABLISHED): the receipt's signature checked out, and what is not established is the
+# log's account of it. A witness key of type 0x06 (ML-DSA-44) is refused by name: ML-DSA is outside
+# the primitives this file computes (THE RULE THIS FILE BOUNDS, above).
+
+CHECKPOINT_FLAGS = ("--checkpoint", "--inclusion-proof", "--witness-policy", "--held-size", "--held-root",
+                    "--consistency-proof", "--key-transition", "--held-state")
+CHECKPOINT_LEAF_TAG = b"requisition.lab.log.leaf.v1\n"
+CHECKPOINT_TRANSITION_TYPE = "requisition.lab.log.key_transition.v0"
+_CHECKPOINT_DECIMAL = re.compile(r"(0|[1-9][0-9]{0,17})\Z")
+_CHECKPOINT_THRESHOLD = re.compile(r"[+-]?[0-9]+\Z")
+_CHECKPOINT_HEX4 = re.compile(r"[0-9a-f]{8}\Z")
+
+
+class CheckpointRefused(Exception):
+    def __init__(self, code, message):
+        super().__init__(message)
+        self.code = code
+
+
+class CheckpointUsage(Exception):
+    pass
+
+
+def _cp_b64(value):
+    """Canonical base64 only: the text must be what encoding its bytes gives back."""
+    raw = b64(value) if isinstance(value, str) else None
+    if raw is None or base64.b64encode(raw).decode("ascii") != value:
+        return None
+    return raw
+
+
+def _cp_hash(data):
+    return hashlib.sha256(data).digest()
+
+
+def _cp_node(left, right):
+    return _cp_hash(b"\x01" + left + right)
+
+
+def checkpoint_key_id(name, key_type, public):
+    """C2SP signed-note's key ID: SHA-256(name || 0x0A || type || public key)[:4]."""
+    return _cp_hash(name.encode("utf-8") + b"\n" + key_type + public)[:4]
+
+
+def checkpoint_vkey(text):
+    """A C2SP vkey <name>+<hex key id>+<base64(type || public key)>, as a dict, or None."""
+    parts = text.split("+", 2)
+    if len(parts) != 3 or parts[0] == "" or not _CHECKPOINT_HEX4.match(parts[1]):
+        return None
+    blob = _cp_b64(parts[2])
+    if blob is None:
+        return None
+    if blob[:1] == b"\x01" and len(blob) == 33:
+        kind = "ed25519"
+    elif blob[:1] == b"\x04" and len(blob) == 33:
+        kind = "cosig_ed25519"
+    elif blob[:1] == b"\x06" and len(blob) == 1313:
+        kind = "cosig_mldsa44"
+    else:
+        return None
+    name, key_id, public = parts[0], bytes.fromhex(parts[1]), blob[1:]
+    if checkpoint_key_id(name, blob[:1], public) != key_id:
+        return None
+    return {"name": name, "id": key_id, "kind": kind, "public": public}
+
+
+def checkpoint_policy(raw):
+    """The relying party's witness policy, read as the lab reads one (its WitnessPolicy, verify
+    mode), and requiring at least one log line. CheckpointUsage on a policy that does not read;
+    CheckpointRefused (checkpoint_algorithm_unsupported) on a witness this file cannot check."""
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        raise CheckpointUsage("the witness policy is not UTF-8")
+    logs, witnesses, components, quorum = [], [], {}, None
+    for number, line in enumerate(text.split("\n"), 1):
+        fields = line.split("#", 1)[0].split()
+        if not fields:
+            continue
+        word = fields[0]
+        if word == "log" and len(fields) >= 2:
+            key = checkpoint_vkey(fields[1])
+            if key is None or key["kind"] != "ed25519":
+                raise CheckpointUsage("the witness policy, line %d: not an Ed25519 log vkey" % number)
+            logs.append(key)
+        elif word == "witness" and len(fields) >= 3:
+            if fields[1] in components:
+                raise CheckpointUsage("the witness policy, line %d: the name %r is taken" % (number, fields[1]))
+            key = checkpoint_vkey(fields[2])
+            if key is None or key["kind"] not in ("cosig_ed25519", "cosig_mldsa44"):
+                raise CheckpointUsage("the witness policy, line %d: not a witness cosigner vkey" % number)
+            components[fields[1]] = ("witness", key)
+            witnesses.append(key)
+        elif word == "group" and len(fields) >= 4:
+            name, threshold, members = fields[1], fields[2], fields[3:]
+            if name in components:
+                raise CheckpointUsage("the witness policy, line %d: the name %r is taken" % (number, name))
+            if threshold == "any":
+                count = 1
+            elif threshold == "all":
+                count = len(members)
+            elif _CHECKPOINT_THRESHOLD.match(threshold) and 1 <= int(threshold) <= len(members):
+                count = int(threshold)
+            else:
+                raise CheckpointUsage("the witness policy, line %d: the threshold %r" % (number, threshold))
+            if any(member not in components for member in members):
+                raise CheckpointUsage("the witness policy, line %d: a member is not defined above it" % number)
+            components[name] = ("group", count, members)
+        elif word == "quorum" and len(fields) >= 2:
+            if quorum is not None:
+                raise CheckpointUsage("the witness policy, line %d: a second quorum line" % number)
+            quorum = fields[1]
+        else:
+            raise CheckpointUsage("the witness policy, line %d: not a policy line" % number)
+    if quorum is None:
+        raise CheckpointUsage("the witness policy has no quorum line")
+    if quorum != "none" and quorum not in components:
+        raise CheckpointUsage("the witness policy's quorum %r is not defined" % quorum)
+    if not logs:
+        raise CheckpointUsage("the witness policy has no log line: the log key is the relying party's to name")
+    unsupported = [key["name"] for key in witnesses if key["kind"] == "cosig_mldsa44"]
+    if unsupported:
+        raise CheckpointRefused(
+            "checkpoint_algorithm_unsupported",
+            "the witness policy names ML-DSA-44 (type 0x06) witness key(s) %s; this verifier computes Ed25519 only"
+            % ", ".join(sorted(unsupported)))
+    return {"logs": logs, "witnesses": witnesses, "components": components, "quorum": quorum}
+
+
+def checkpoint_note(raw):
+    """A C2SP signed note carrying a checkpoint: (text, origin, size, SHA-256 root, [(name, raw)])."""
+    try:
+        note = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        raise CheckpointRefused("checkpoint_note_malformed", "the checkpoint is not UTF-8")
+    if any(ord(ch) < 0x20 and ch != "\n" for ch in note) or "\x7f" in note:
+        raise CheckpointRefused("checkpoint_note_malformed", "the checkpoint carries a control character")
+    split = note.rfind("\n\n")
+    if split < 0 or not note.endswith("\n"):
+        raise CheckpointRefused("checkpoint_note_malformed", "no blank line between the text and the signatures")
+    text, block = note[: split + 1], note[split + 2:]
+    lines = block.split("\n")[:-1]
+    if not lines or len(lines) > 16:
+        raise CheckpointRefused("checkpoint_note_malformed", "%d signature lines (1 to 16)" % len(lines))
+    signatures, seen = [], set()
+    for line in lines:
+        parts = line[2:].split(" ") if line.startswith("— ") else []
+        signature = _cp_b64(parts[1]) if len(parts) == 2 and parts[0] != "" else None
+        if signature is None or len(signature) < 5:
+            raise CheckpointRefused("checkpoint_note_malformed", "a signature line is not '— <name> <base64>'")
+        if (parts[0], signature[:4]) in seen:
+            raise CheckpointRefused("checkpoint_note_malformed", "two signature lines of one name and key")
+        seen.add((parts[0], signature[:4]))
+        signatures.append((parts[0], signature))
+    rows = text[:-1].split("\n")
+    if len(rows) < 3 or "" in rows or not _CHECKPOINT_DECIMAL.match(rows[1]):
+        raise CheckpointRefused("checkpoint_note_malformed", "the text is not origin, decimal size, root")
+    root = _cp_b64(rows[2])
+    if root is None or len(root) != 32:
+        raise CheckpointRefused("checkpoint_note_malformed", "the root line is not a base64 SHA-256 hash")
+    return {"text": text, "origin": rows[0], "size": int(rows[1]), "root": root, "signatures": signatures}
+
+
+def checkpoint_transition(record, origin, logs):
+    """The new log key a key-transition record names, when its signed metadata carries the old key's
+    endorsement and the old key is one of the policy's log keys: (old key, new key)."""
+    try:
+        signed = parse_json(record["signed_payload"])
+        meta = signed["metadata"]
+        previous, new = _cp_b64(meta["previous_public_key"]), _cp_b64(meta["new_public_key"])
+        endorsement = _cp_b64(meta["endorsement"])
+        size, root = meta["previous_checkpoint_size"], meta["previous_checkpoint_root_sha256"]
+        point = _cp_b64(root) if isinstance(root, str) else None
+        usable = (signed["receipt_type"] == CHECKPOINT_TRANSITION_TYPE and meta["origin"] == origin
+                  and None not in (previous, new, endorsement, point) and len(new) == 32 and len(point) == 32
+                  and isinstance(size, int) and not isinstance(size, bool) and size >= 0)
+    except (KeyError, TypeError, ValueError):
+        usable = False
+    if not usable:
+        raise CheckpointRefused("checkpoint_transition_unendorsed",
+                                "the key-transition record does not name this log's origin, both keys and an endorsement")
+    old = [key for key in logs if key["public"] == previous and key["name"] == origin]
+    message = (b"\x00" + ("%s\n%s\n%d\n%s\n" % (CHECKPOINT_TRANSITION_TYPE, origin, size, root)).encode("utf-8")
+               + base64.b64encode(new) + b"\n")
+    if not old or not ed25519_verify(endorsement, message, previous):
+        raise CheckpointRefused("checkpoint_transition_unendorsed",
+                                "the key change is not endorsed by a log key the witness policy names")
+    return old[0], {"name": origin, "id": checkpoint_key_id(origin, b"\x01", new), "kind": "ed25519",
+                    "public": new, "size": size, "root": point}
+
+
+def _cp_cosignature(key, text, raw):
+    """A type 0x04 checkpoint cosignature (C2SP tlog-cosignature): key id || u64be time || Ed25519
+    over "cosignature/v1\\ntime <t>\\n" || the note text."""
+    if len(raw) != 4 + 8 + 64:
+        return False
+    time = int.from_bytes(raw[4:12], "big")
+    if time > 2 ** 63 - 1:
+        return False
+    message = ("cosignature/v1\ntime %d\n" % time).encode("utf-8") + text.encode("utf-8")
+    return ed25519_verify(raw[12:], message, key["public"])
+
+
+def _cp_satisfied(policy, name, signers):
+    component = policy["components"][name]
+    if component[0] == "witness":
+        return (component[1]["name"], component[1]["id"]) in signers
+    return sum(1 for member in component[2] if _cp_satisfied(policy, member, signers)) >= component[1]
+
+
+def checkpoint_cosigned(policy, note, logs):
+    """The policy's judgement of the note, as the lab's WitnessPolicy.verify_cosigned makes it: every
+    line of a known key verifies and at least one does; every log key carries the note's origin as its
+    name and signed it; the cosigners meet the quorum. `logs` are the log keys that must have signed.
+    The list of the cosigners (key dicts), in note order."""
+    keys = logs + policy["witnesses"]
+    verified = []
+    for name, raw in note["signatures"]:
+        key = next((k for k in keys if k["name"] == name and k["id"] == raw[:4]), None)
+        if key is None:
+            continue
+        if key["kind"] == "ed25519":
+            ok = ed25519_verify(raw[4:], note["text"].encode("utf-8"), key["public"])
+        else:
+            ok = _cp_cosignature(key, note["text"], raw)
+        if not ok:
+            raise CheckpointRefused("checkpoint_signature_invalid",
+                                    "the line of %s (key %s) does not verify" % (name, raw[:4].hex()))
+        verified.append(key)
+    if not verified:
+        raise CheckpointRefused("checkpoint_no_trusted_signature",
+                                "no line of the checkpoint is by a key the witness policy names")
+    if any(key["name"] != note["origin"] for key in logs):
+        raise CheckpointRefused("checkpoint_origin_mismatch",
+                                "the checkpoint is for origin %r, not the log the witness policy names" % note["origin"])
+    if any(key not in verified for key in logs):
+        raise CheckpointRefused("checkpoint_no_trusted_signature",
+                                "the log key the witness policy names did not sign the checkpoint")
+    cosigners = [key for key in verified if key["kind"] != "ed25519"]
+    if policy["quorum"] != "none" and not _cp_satisfied(
+            policy, policy["quorum"], {(key["name"], key["id"]) for key in cosigners}):
+        raise CheckpointRefused("checkpoint_quorum_not_met",
+                                "the witness quorum %r is not met; cosigned by: %s" % (
+                                    policy["quorum"], ", ".join(key["name"] for key in cosigners) or "no witness"))
+    return cosigners
+
+
+def checkpoint_leaf(receipt):
+    """The receipt's leaf in the lab's log, or CheckpointRefused (checkpoint_leaf_malformed)."""
+    payload = receipt["signed_payload"].encode("utf-8")
+    signature = _cp_b64(receipt["signature"])
+    cosignature = member(receipt, "cosignature")
+    if isinstance(cosignature, dict):
+        cosignature = member(cosignature, "signature")
+    co = b"" if cosignature is None else _cp_b64(cosignature)
+    if signature is None or co is None or len(signature) >= 65536 or len(co) >= 65536:
+        raise CheckpointRefused("checkpoint_leaf_malformed",
+                                "the receipt's signature or co-signature is not canonical base64 under 65,536 bytes")
+    return (CHECKPOINT_LEAF_TAG + len(payload).to_bytes(4, "big") + payload + len(signature).to_bytes(2, "big")
+            + signature + len(co).to_bytes(2, "big") + co)
+
+
+def _cp_proof(document, sizes):
+    """The proof hashes of a proof document whose hash is sha256 and whose sizes are `sizes`."""
+    if not isinstance(document, dict) or member(document, "hash") not in (None, "sha256"):
+        raise CheckpointRefused("checkpoint_proof_malformed", "a proof that is not an object over the SHA-256 tree")
+    for name, value in sizes.items():
+        found = member(document, name)
+        if not isinstance(found, int) or isinstance(found, bool) or found != value:
+            raise CheckpointRefused("checkpoint_proof_malformed", "the proof's %s is %r, not %d" % (name, found, value))
+    hashes = member(document, "proof")
+    out = [_cp_b64(h) for h in hashes] if isinstance(hashes, list) else None
+    if out is None or any(h is None or len(h) != 32 for h in out):
+        raise CheckpointRefused("checkpoint_proof_malformed", "the proof is not a list of base64 SHA-256 hashes")
+    return out
+
+
+def checkpoint_verify_inclusion(leaf_hash, index, size, proof, root):
+    """RFC 9162 section 2.1.3.2."""
+    if not 0 <= index < size:
+        return False
+    fn, sn, r = index, size - 1, leaf_hash
+    for p in proof:
+        if sn == 0:
+            return False
+        if fn & 1 or fn == sn:
+            r = _cp_node(p, r)
+            while not fn & 1 and fn != 0:
+                fn >>= 1
+                sn >>= 1
+        else:
+            r = _cp_node(r, p)
+        fn >>= 1
+        sn >>= 1
+    return sn == 0 and r == root
+
+
+def checkpoint_verify_consistency(first, second, proof, first_root, second_root):
+    """RFC 9162 section 2.1.4.2, for 0 < first < second."""
+    if not 0 < first < second or not proof:
+        return False
+    path = [first_root] + proof if first & (first - 1) == 0 else list(proof)
+    fn, sn = first - 1, second - 1
+    while fn & 1:
+        fn >>= 1
+        sn >>= 1
+    fr = sr = path[0]
+    for c in path[1:]:
+        if sn == 0:
+            return False
+        if fn & 1 or fn == sn:
+            fr, sr = _cp_node(c, fr), _cp_node(c, sr)
+            while not fn & 1 and fn != 0:
+                fn >>= 1
+                sn >>= 1
+        else:
+            sr = _cp_node(sr, c)
+        fn >>= 1
+        sn >>= 1
+    return sn == 0 and fr == first_root and sr == second_root
+
+
+def checkpoint_check(receipt, inputs):
+    """The three checks over the inputs read by main (raw bytes and JSON values); the lines a pass
+    prints, or CheckpointRefused / CheckpointUsage."""
+    policy = checkpoint_policy(inputs["witness-policy"])
+    note = checkpoint_note(inputs["checkpoint"])
+    logs, lines, new = list(policy["logs"]), [], None
+    if "key-transition" in inputs:
+        old, new = checkpoint_transition(inputs["key-transition"], note["origin"], logs)
+        logs = [new if key is old else key for key in logs]
+        lines.append("key transition at size %d: the log key %s endorsed the key %s"
+                     % (new["size"], old["id"].hex(), new["id"].hex()))
+    cosigners = checkpoint_cosigned(policy, note, logs)
+    lines = ["origin %s, size %d, root sha256 %s" % (note["origin"], note["size"],
+                                                     base64.b64encode(note["root"]).decode("ascii"))] + lines
+    lines += ["signed by the log key %s+%s" % (key["name"], key["id"].hex()) for key in logs]
+    lines.append("witness quorum %s met; cosigned by %s" % (
+        policy["quorum"], ", ".join("%s (key %s)" % (k["name"], k["id"].hex()) for k in cosigners) or "no witness"))
+    document = inputs["inclusion-proof"]
+    index = member(document, "leaf_index") if isinstance(document, dict) else None
+    if not isinstance(index, int) or isinstance(index, bool):
+        raise CheckpointRefused("checkpoint_proof_malformed", "the inclusion proof has no integer leaf_index")
+    proof = _cp_proof(document, {"tree_size": note["size"]})
+    leaf_hash = _cp_hash(b"\x00" + checkpoint_leaf(receipt))
+    stated = member(document, "leaf_hash")
+    if stated is not None and _cp_b64(stated) != leaf_hash:
+        raise CheckpointRefused("checkpoint_inclusion_invalid", "the proof's leaf_hash is not this receipt's leaf")
+    if not checkpoint_verify_inclusion(leaf_hash, index, note["size"], proof, note["root"]):
+        raise CheckpointRefused("checkpoint_inclusion_invalid",
+                                "the receipt is not leaf %d of the tree of size %d" % (index, note["size"]))
+    lines.append("the receipt is leaf %d of %d (RFC 9162 inclusion proof, SHA-256)" % (index, note["size"]))
+    held = inputs.get("held")
+    if held is not None and held[2] is not None and held[2] != note["origin"]:
+        raise CheckpointUsage("the held-state file is for the log %r, not %r" % (held[2], note["origin"]))
+    if new is not None:
+        # the new key signs only checkpoints at or after the point the old key endorsed it at, and at that point the
+        # endorsed root; a held tree older than that point is checked from it
+        if note["size"] < new["size"]:
+            raise CheckpointRefused("checkpoint_before_transition",
+                                    "the checkpoint's size %d is below the key transition's size %d"
+                                    % (note["size"], new["size"]))
+        if note["size"] == new["size"] and note["root"] != new["root"]:
+            raise CheckpointRefused("checkpoint_transition_root_mismatch",
+                                    "size %d: the checkpoint's root is not the root the key transition names" % new["size"])
+        if held is not None and held[0] < new["size"]:
+            lines.append("held size %d is below the key transition at size %d: checked from the transition point"
+                         % (held[0], new["size"]))
+            held = (new["size"], new["root"], held[2])
+    if held is None:
+        lines.append("%s: a checkpoint older than a size the relying party holds is not refused"
+                     % ("the held-state file is absent: nothing held" if "held-state" in inputs else "no held size given"))
+    elif note["size"] < held[0]:
+        raise CheckpointRefused("checkpoint_older_than_held", "the checkpoint's size %d is below the held size %d"
+                                % (note["size"], held[0]))
+    elif note["size"] == held[0]:
+        if note["root"] != held[1]:
+            raise CheckpointRefused("checkpoint_split_view_at_held_size",
+                                    "size %d: the checkpoint's root is not the held root" % held[0])
+        lines.append("not older than the held size %d: the same root" % held[0])
+    else:
+        if "consistency-proof" not in inputs:
+            raise CheckpointRefused("checkpoint_consistency_unproven",
+                                    "the checkpoint is larger than the held size %d and no consistency proof is given"
+                                    % held[0])
+        proof = _cp_proof(inputs["consistency-proof"], {"old": held[0], "new": note["size"]})
+        if not checkpoint_verify_consistency(held[0], note["size"], proof, held[1], note["root"]):
+            raise CheckpointRefused("checkpoint_consistency_invalid", "the tree of size %d does not extend the held "
+                                    "tree of size %d" % (note["size"], held[0]))
+        lines.append("not older than the held size %d: consistent with it (RFC 9162 consistency proof)" % held[0])
+    lines.append("all checks held: inclusion, witness quorum, not older than the held size")
+    return ["log checkpoint: " + line for line in lines], note
+
+
+def checkpoint_state_text(note):
+    """The held-state file's text for a checkpoint: its origin, size and SHA-256 root."""
+    return json.dumps({"origin": note["origin"], "root": base64.b64encode(note["root"]).decode("ascii"),
+                       "size": note["size"]}, sort_keys=True) + "\n"
+
+
+def checkpoint_held(opts):
+    """The held (size, root, origin or None) the relying party gives, from --held-size and --held-root or from
+    --held-state (absent file: None); CheckpointUsage otherwise."""
+    if "held-state" in opts:
+        if "held-size" in opts or "held-root" in opts:
+            raise CheckpointUsage("--held-state and --held-size/--held-root are two sources of one thing; give one")
+        try:
+            state = read_json(opts["held-state"])
+        except FileNotFoundError:
+            return None
+        except (OSError, ValueError, UnicodeDecodeError) as error:
+            raise CheckpointUsage("the held-state file is not readable: %s" % error)
+        size, root, origin = member(state, "size"), member(state, "root"), member(state, "origin")
+        if not isinstance(origin, str) or not isinstance(size, int) or isinstance(size, bool):
+            raise CheckpointUsage("the held-state file is not {\"origin\", \"root\", \"size\"}")
+        size, root_text = str(size), root
+    elif "held-size" in opts or "held-root" in opts:
+        if "held-size" not in opts or "held-root" not in opts:
+            raise CheckpointUsage("--held-size and --held-root go together")
+        size, root_text, origin = opts["held-size"], opts["held-root"], None
+    else:
+        return None
+    root = _cp_b64(root_text) if isinstance(root_text, str) else None
+    if not _CHECKPOINT_DECIMAL.match(size) or int(size) < 1 or root is None or len(root) != 32:
+        raise CheckpointUsage("a held size is a decimal of at least 1, and a held root a base64 SHA-256 hash")
+    return int(size), root, origin
+
+
+def checkpoint_inputs(opts):
+    """None without --checkpoint and its companions; else the inputs, read (CheckpointUsage when incomplete).
+    JSON inputs are read by THE READING RULE (read_json)."""
+    given = [flag[2:] for flag in CHECKPOINT_FLAGS + ("--write-held-state",) if flag[2:] in opts]
+    if not given:
+        return None
+    for needed in ("checkpoint", "inclusion-proof", "witness-policy"):
+        if needed not in opts:
+            raise CheckpointUsage("--checkpoint, --inclusion-proof and --witness-policy go together")
+    held = checkpoint_held(opts)
+    if "consistency-proof" in opts and held is None and "held-state" not in opts:
+        raise CheckpointUsage("--consistency-proof proves consistency with a held size: give one")
+    if "write-held-state" in opts and "held-state" not in opts:
+        raise CheckpointUsage("--write-held-state writes the file --held-state names")
+    inputs = {"held": held}
+    for name in ("checkpoint", "witness-policy"):
+        with open(opts[name], "rb") as handle:
+            raw = handle.read(MAX_INPUT_BYTES + 1)
+        if len(raw) > MAX_INPUT_BYTES:
+            raise CheckpointUsage("%s is larger than %d bytes" % (opts[name], MAX_INPUT_BYTES))
+        inputs[name] = raw
+    for name in ("inclusion-proof", "consistency-proof", "key-transition"):
+        if name in opts:
+            inputs[name] = read_json(opts[name])
+    for name in ("held-state", "write-held-state"):
+        if name in opts:
+            inputs[name] = opts[name]
+    return inputs
+
+
 def main(argv):
     # The messages carry characters outside ASCII. Under an ASCII or Latin-1 stream a strict encoder
     # would raise in the middle of a verdict, so a verified receipt could end in a stack trace; the
@@ -460,11 +953,14 @@ def main(argv):
     index = 0
     while index < len(argv):
         flag = argv[index]
-        if flag in ("--receipt", "--registry"):
+        if flag in ("--receipt", "--registry") + CHECKPOINT_FLAGS:
             if index + 1 >= len(argv):
                 die(EXIT_USAGE, "usage: %s requires a value" % flag)
             opts[flag[2:]] = argv[index + 1]
             index += 2
+        elif flag == "--write-held-state":
+            opts["write-held-state"] = True
+            index += 1
         else:
             index += 1
 
@@ -494,6 +990,14 @@ def main(argv):
     try:
         receipt = read_json(opts["receipt"])
         registry = read_json(opts["registry"])
+    except (OSError, ValueError) as error:
+        die(EXIT_USAGE, "cannot read input: %s" % error)
+
+    # the log checkpoint's inputs (CHECKPOINTS.md), read now; judged only once the receipt verified
+    try:
+        checkpoint = checkpoint_inputs(opts)
+    except CheckpointUsage as error:
+        die(EXIT_USAGE, "usage: %s" % error)
     except (OSError, ValueError) as error:
         die(EXIT_USAGE, "cannot read input: %s" % error)
 
@@ -756,12 +1260,38 @@ def main(argv):
             "Note what this attests: the signed bytes carry the receipt's sequence and previous_hash, so\n"
             "a valid signature binds the receipt's POSITION IN ITS CHAIN as well as its content."
         )
+    checkpoint_lines = []
+    if checkpoint is not None:
+        try:
+            checkpoint_lines, judged = checkpoint_check(receipt, checkpoint)
+        except CheckpointUsage as error:
+            die(EXIT_USAGE, "usage: %s" % error)
+        except CheckpointRefused as refusal:
+            die(
+                EXIT_NO_TRUST,
+                "TRUST NOT ESTABLISHED — the log checkpoint: %s.\n\n"
+                "The receipt's signature is valid under key_id %r. What is not established is the log's\n"
+                "account of it: its inclusion under a checkpoint that the log key and the witnesses your\n"
+                "policy names signed, not older than the tree size you hold." % (refusal, key_id),
+                verdict_code=refusal.code,
+            )
+        held = checkpoint["held"]
+        if "write-held-state" in checkpoint and (held is None or judged["size"] > held[0]):
+            try:
+                with open(checkpoint["held-state"], "w", encoding="utf-8") as handle:
+                    handle.write(checkpoint_state_text(judged))
+            except OSError as error:
+                die(EXIT_USAGE, "cannot write the held-state file %s: %s" % (checkpoint["held-state"], error))
+            checkpoint_lines.append("log checkpoint: the held-state file now holds size %d" % judged["size"])
+
     print(
         "VERIFIED — signature is valid under key_id %r (status: %s).\n\n"
         "A retired key verifies exactly like an active one WITHIN ITS SIGNING WINDOW. Rotation does\n"
         "not invalidate receipts already issued; only new signing stops.\n\n"
         "%s" % (key_id, status, note)
     )
+    for line in checkpoint_lines:
+        print(line)
     sys.exit(EXIT_VERIFIED)
 
 
