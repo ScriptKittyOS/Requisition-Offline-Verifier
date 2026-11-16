@@ -10,7 +10,7 @@ The evaluation environment is not part of a production release of Requisition. A
 
 ## Verify it
 
-Requirements: Python 3 (tested with 3.11.15 and 3.12.3) and a POSIX shell. From a copy of this repository there is nothing to install. No network access is used.
+Requirements: Python 3.11 or newer and a POSIX shell. It was tested with Python 3.11.15 and 3.12.3 on Linux; other versions were not tested. From a copy of this repository there is nothing to install. No network access is used.
 
 ```
 sh verify.sh
@@ -51,7 +51,7 @@ On macOS use `shasum -a 256 -c SHA256SUMS`.
 This verifier is not a package: it is the files of this repository. There are two ways to get them, and neither downloads and runs a script.
 
 - **A copy of this repository.** There is nothing to install; run `sh verify.sh` as above.
-- **The release's offline bundle**, for a machine without network access: `requisition-offline-verifier-<version>-offline.tar.gz`. It holds the release archive, its software bill of materials (CycloneDX) and a `SHA256SUMS` file. A digest inside the same bundle is not an anchor by itself, so anchor `SHA256SUMS` before you rely on it: check its detached signature `SHA256SUMS.asc` against the release key (see [Signed releases](PROVENANCE.md#signed-releases)), or compare its SHA-256 with the value published with the release. Then:
+- **The release's offline bundle**, for a machine without network access: `requisition-offline-verifier-<version>-offline.tar.gz`. Unpack it first (`tar -xzf requisition-offline-verifier-<version>-offline.tar.gz`, then `cd requisition-offline-verifier-<version>-offline`). It holds the release archive, its software bill of materials (CycloneDX) and a `SHA256SUMS` file. A digest inside the same bundle is not an anchor by itself, so anchor `SHA256SUMS` before you rely on it: check its detached signature `SHA256SUMS.asc` against the release key (see [Signed releases](PROVENANCE.md#signed-releases)), or compare its SHA-256 with the value published with the release. Then:
 
 ```
 sha256sum -c SHA256SUMS
@@ -66,8 +66,8 @@ Two companion packages, `requisition-aws` for Python and `requisition-ts` for Ty
 ## What happened in the run
 
 1. An AI agent asked, through a tool call, to refund 12.50 USD to a customer account, reason "duplicate charge". The exact arguments are in [`record/arguments.json`](record/arguments.json).
-2. Requisition signed a **statement** ([`record/statement.json`](record/statement.json), sequence 15). It fixes the hash of the action, a digest of what the approvers were shown, and the identifiers of the two approver accounts.
-3. The request was approved by two separate accounts, neither of them the requester's.
+2. The request was approved by two separate accounts, neither of them the requester's.
+3. Requisition signed a **statement** ([`record/statement.json`](record/statement.json), sequence 15). It fixes the hash of the action, a digest of what the approvers were shown, and the identifiers of the two approver accounts.
 4. Requisition signed a **decision** ([`record/decision.json`](record/decision.json), sequence 16, verdict `allow`). It names the statement it follows and carries the same action hash.
 
 ## What the verifier checks
@@ -99,15 +99,15 @@ Given the flags `--checkpoint`, `--inclusion-proof` and `--witness-policy`, and 
 
 A pass of this check shows that the record is in the evaluation environment's log at the checkpoint's tree size, and that this tree is an append-only extension of the tree you hold. It does not show that the checkpoint is the newest the evaluation environment's log has made, that the action ran, or anything about another record.
 
-In the evaluation environment, witness cosignatures are what make a log that shows different histories to different parties detectable, and they do so for witness keys you configure yourself, at a threshold you choose, and as far as those witnesses are independent of the log. A cosignature of the evaluation environment shows what a key signed, never who holds the key.
+In the evaluation environment, a consistency proof covers only the tree you hold and the checkpoint given, and cannot show that another party was shown a different history; witness cosignatures are what can make that detectable, only for witness keys you configure yourself, at a threshold you choose, and as far as those witnesses are independent of the log. A cosignature of the evaluation environment shows what a key signed, never who holds the key.
 
 If you keep the tree size you hold in a held-state file (`--held-state`), the evaluation environment's checkpoint is compared with that file and the check holds only as far as the file does: a lost or reset file compares the next checkpoint with nothing, and a file restored from a backup, copied from an older machine or written by someone else compares it with that older or chosen state. The file carries no signature or checksum of its own.
 
 A refused checkpoint of the evaluation environment is named by its code, and `verify_offline.py` then ends with `verdict: FAIL (the log checkpoint: <code>)` and exit status 6. Not checked, in the evaluation environment: ML-DSA-44 witness cosignatures and a record whose own signature is ML-DSA-87 (both refused by name), the age of a checkpoint, and who runs a witness.
 
-Each check of the evaluation environment's log, each input, every refusal code and what is not checked are stated in [`verifier/CHECKPOINTS.md`](verifier/CHECKPOINTS.md); what `verify_offline.py` adds to them is in [`CHECKPOINTS.md`](CHECKPOINTS.md).
+Each check of the evaluation environment's log, each input, every refusal code and what is not checked are stated in [`verifier/CHECKPOINTS.md`](verifier/CHECKPOINTS.md); what `verify_offline.py` adds to them is in [`CHECKPOINTS.md`](CHECKPOINTS.md). Both are unchanged copies from their source trees, so they name paths there; [`PROVENANCE.md`](PROVENANCE.md) maps those paths to this repository and states what differs.
 
-To run the check on real inputs of the evaluation environment, run `sh checkpoint-test.sh`. It runs `verify_offline.py` with these flags over the 32 cases in [`checkpoint-vectors/`](checkpoint-vectors/manifest.json), which the evaluation environment's own code made, and compares each answer with the one the case's manifest entry expects: 6 cases pass and 26 are refused, each by its code. The last line is `RESULT: PASS (32 cases: 6 pass, 26 refused by name, each as expected)`. The vectors were made in a test run of the evaluation environment, under a development key and with test witnesses; they are not the 13 November records, and their key is not one of the AWS KMS keys of the evaluation environment named below. Each negative case changes the producer's bytes in one stated way. [`PROVENANCE.md`](PROVENANCE.md) says where they come from.
+To run the check on inputs made by the evaluation environment's own code, run `sh checkpoint-test.sh`. It runs `verify_offline.py` with these flags over the 32 cases in [`checkpoint-vectors/`](checkpoint-vectors/manifest.json) and compares each answer with the one the case's manifest entry expects: 6 cases pass and 26 are refused, each by its code. The last line is `RESULT: PASS (32 cases: 6 pass, 26 refused by name, each as expected)`. The vectors were made in a test run of the evaluation environment, under a development key and with test witnesses; they are not the 13 November records, and their key is not one of the AWS KMS keys of the evaluation environment named below. Each negative case changes the producer's bytes in one stated way. [`PROVENANCE.md`](PROVENANCE.md) says where they come from.
 
 ### About `DEGRADED (lab)` in the output
 
@@ -126,7 +126,7 @@ A pass does not prove the following, and this repository does not claim it.
 - **The keys are evaluation keys, not a trust root.** Each entry of the key file is marked `"profile": "lab"`. You are trusting this repository to give you the right key file. A production deployment anchors its keys in a trust root that the relying party controls; that is not shown here.
 - **Key custody is asserted, not verified.** The key file says the two private keys, keys of the evaluation environment, are held in AWS KMS and cannot be exported. An offline check cannot confirm where a private key lives.
 - **Nothing proves the action was carried out.** The records are a statement and a decision. A pass says nothing about what happened after the decision.
-- **Signed times are not compared with the current time.** The statement carries `occurred_at`, `iat`, `nbf` and `exp`; the decision carries `occurred_at`, `not_after` and `exec_not_after`. The verifier checks that each key was valid at the record's signed `occurred_at`; it does not check whether a record has since expired. These are historical records.
+- **Signed times are not compared with the current time.** The statement carries `occurred_at`, `iat`, `nbf` and `exp`; the decision carries `occurred_at`, `decided_at`, `not_after` and `exec_not_after`. The verifier checks that each key was valid at the record's signed `occurred_at`; it does not check whether a record has since expired. These are historical records.
 - **One record is judged at a time.** A pass says nothing about other records of the same environment: whether a later record exists, or whether a record was withheld.
 - **The server is not public.** You can verify the signed output of the run. You cannot reproduce the run.
 
