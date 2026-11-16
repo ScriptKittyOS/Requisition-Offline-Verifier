@@ -32,9 +32,6 @@ HEADER_LINES = 5
 COMMENT_LEADERS = ("//", "#", "%%", "%")
 EXEMPT = {
     "verifier/vendor/mldsa.py": "mldsa-py 1.0.1 by Filippo Valsorda, CC0-1.0 OR 0BSD, byte for byte (verifier/vendor/VENDORED.md)",
-    "verifier/verify_receipt.py": "header added by the verifier series",
-    "verifier/lab-verify": "header added by the verifier series",
-    "verifier/verify_offline.py": "header added by the verifier series",
 }
 PYCA_REQUIREMENTS = "interop/verifiers/pyca-cryptography/requirements.txt"
 NOBLE_LOCK = "interop/verifiers/noble-post-quantum/package-lock.json"
