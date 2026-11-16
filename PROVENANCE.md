@@ -25,9 +25,9 @@ history.
 
 | File | Source path | Source commit | SHA-256 | Changes |
 |---|---|---|---|---|
-| `verifier/verify_offline.py` | `bin/verify_offline.py` (requisition-aws) | `b8571e3e057f` | `61d48b1704442975fe18ca32178ae1ef3032ea52390cd10204041830db2eb184` | none |
-| `verifier/lab-verify` | `bin/lab-verify` (requisition) | `e3f9e732d291` | `7962ad753029b13720fd0f5c0b600d3af545a6c683b1365fa51580e73558738f` | one: see below |
-| `verifier/verify_receipt.py` | `bench/holytrinity-v2/verifier/verify_receipt.py` (requisition) | `e3f9e732d291` | `9c0a49988cd5cbd81c629d9122335cc49d51baa35ff1a1c3e8315e5da40310ba` | none |
+| `verifier/verify_offline.py` | `bin/verify_offline.py` (requisition-aws) | `13f7729fcce3` | `813edaf013670a23d3303415eeb6b821ac475cb55c196a303096a33e8b752e24` | none |
+| `verifier/lab-verify` | `bin/lab-verify` (requisition) | `61e49fea9938` | `95a5eff63b518a80a653d8a26ee16ebd86f2d1aed72e14f9e7037fbd1d56b097` (source file: `293cec59a879a89861473a9dbfff0ce45098532b8f194e963a06033de55abba3`) | one: see below |
+| `verifier/verify_receipt.py` | `bench/holytrinity-v2/verifier/verify_receipt.py` (requisition) | `61e49fea9938` | `162c2e4d1ee0a129e2cc6899e638ad67847896eb3605ba3338089c8906213539` | none |
 | `verifier/vendor/mldsa.py` | mldsa-py 1.0.1, `src/mldsa/mldsa.py` | upstream release | `0e8885d01ed76919f3152caa160f90949c03efc6a3748865aaf4beb2737c7a4a` | none |
 | `verifier/vendor/LICENSE.mldsa` | mldsa-py 1.0.1, `LICENSE` | upstream release | `74b344a43288283ca7896b38d859bd6b91035110bb9c69856afbc60a01ff65e4` | none |
 
@@ -36,7 +36,7 @@ history.
 that path was changed. Nothing else differs. The complete difference from the source file:
 
 ```diff
-138,144c138
+155,161c155
 < VERIFIER = os.path.join(
 <     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
 <     "bench",
@@ -49,7 +49,13 @@ that path was changed. Nothing else differs. The complete difference from the so
 ```
 
 Because the source files are otherwise unchanged, their comments and some output lines use the source trees' paths
-(`bin/lab-verify`, `bin/vendor/mldsa.py`) and the project's internal reference numbers and work names (`G-…`, `REQ-…`, round and finding names).
+(`bin/lab-verify`, `bin/vendor/mldsa.py`, `bench/holytrinity-v2/verifier/CHECKPOINTS.md`), and `lab-verify` carries
+the project's reference `G-301` inside the two values of the signed `hands` label that it accepts.
+
+The table named commits `e3f9e732d291` (requisition) and `b8571e3e057f` (requisition-aws) for the files of
+2026-11-15, with SHA-256 `7962ad75…738f` (`lab-verify`), `9c0a4998…10ba` (`verify_receipt.py`) and `61d48b17…b184`
+(`verify_offline.py`). The files of 2026-11-16 above replace them; "Changes to the verifier on 2026-11-16" below lists
+each difference.
 
 ### Source commits, corrected on 2026-11-15
 
@@ -64,9 +70,9 @@ tag itself is not edited.
 The three files in the table above are the files of the two repositories' main history at the commits named there.
 With them, `verify.sh` prints the same output as with the v0.1.0 files, and so does `tamper-test.sh`.
 
-### Changes to the verifier since v0.1.0
+### Changes to the verifier from v0.1.0 to the files of 2026-11-15
 
-Each line is a difference between a v0.1.0 file and the current one, found by reading the difference of the two
+Each line is a difference between a v0.1.0 file and the file of 2026-11-15, found by reading the difference of the two
 files. Each difference in what a file prints or answers was checked by running both files on the same input, except
 where a line says it was read in the code. "Exit" is the exit status of the file named.
 
@@ -175,6 +181,143 @@ All three files
   non-canonical R. `verifier/verify_receipt.py` in this repository refuses such a signature (exit 1,
   `signature_invalid`).
 
+### Changes to the verifier on 2026-11-16
+
+Each line is a difference between the file of 2026-11-15 and the one in the table above, found by reading the
+difference of the two files. A line says "measured" when it was checked by running the files, and "read in the code"
+otherwise.
+
+All three files
+
+- Each starts with the `SPDX-License-Identifier: Apache-2.0` line and the copyright line (as a convenience; see the
+  licence section below).
+- Comments and docstrings were reworded: internal references were removed or replaced by a description.
+- Without the log checkpoint flags below, `verify.sh` prints the same output as with the files of 2026-11-15, equal to
+  `expected-output.txt`, and `tamper-test.sh` the same output (measured).
+- `ed25519_verify` in `verify_receipt.py`, and `ed25519_key_acceptable` and `ed25519_signature_canonical` in
+  `lab-verify`, are unchanged; `check_ed25519_material` in `lab-verify` differs only in its docstring (read in the
+  code, by comparing the source text of each function).
+
+The log checkpoint check, in all three files. The flags `--checkpoint`, `--inclusion-proof`, `--witness-policy`,
+`--held-size`, `--held-root`, `--held-state`, `--write-held-state`, `--consistency-proof` and `--key-transition`
+check a record against a checkpoint of the evaluation environment's log. `verifier/CHECKPOINTS.md` and
+`CHECKPOINTS.md` state each check, input and refusal.
+
+- `verify_receipt.py` judges the checkpoint after the receipt's own signature verified. A refusal exits 5 with a
+  `checkpoint_` code; a pass prints `log checkpoint:` lines after the receipt's verdict. The file of 2026-11-15 skipped
+  these flags without a word: given `--checkpoint`, it answered exit 0 for a valid receipt and said nothing of the
+  log (measured on `checkpoint-vectors/records/main-1.json`).
+- `lab-verify` hands the flags to `verify_receipt.py` on the Ed25519 path and passes its refusals through. On its
+  exit 0 it requires the line `log checkpoint: all checks held: ...`, else exit 5, `lab_verifier_unavailable` (read
+  in the code). On the ML-DSA-87 path the flags are refused, exit 5, `lab_checkpoint_unchecked_mldsa87` (read in the
+  code). A flag given twice is a usage error, exit 2 (measured). The file of 2026-11-15 refused the flags as unknown
+  arguments, exit 2 (measured).
+- `verify_offline.py` hands the flags to `lab-verify`, with the co-signature beside the record. A checkpoint refusal
+  ends `verdict: FAIL (the log checkpoint: <code>)`, exit 6; a pass adds a section 4 with the `log checkpoint:` lines
+  and one sentence to the PASS line (measured over the 32 cases of `checkpoint-vectors/`, see below). A usage error
+  that `lab-verify` reports for these inputs is exit 2 (read in the code). The file of 2026-11-15 refused the flags as
+  a usage error, exit 2 (measured).
+
+`verifier/lab-verify`
+
+- The signed `hands` label may carry either of two values, `one-person (G-301)` and `two-account, two-passkey
+  (G-301)`; any other value is refused as before, exit 1, `lab_label_missing`, and the message lists the two values.
+  A record signed with the second value must carry two distinct `sanctioners` and two distinct `approval_records`,
+  else exit 1, `lab_hands_unsupported`; when it passes, its answer adds a line saying what that value rests on and
+  that it is not re-derived here. A record that carries a `hands_evidence` member is refused, exit 1,
+  `lab_hands_unsupported`. The file of 2026-11-15 refused every value but the first, exit 1, `lab_label_missing`.
+  (Read in the code; both records here carry the first value, and their answers did not change.)
+- The message of `lab_label_missing` no longer names an internal decision; it says that every lab record is signed
+  with the four labels (read in the code).
+
+`verifier/verify_offline.py`
+
+- Its second encoder, `canonical_payload.v4`, which it does not use to verify a record, refuses the integer `-0` as
+  `negative_zero` (read in the code).
+
+## The log checkpoint check: its documents, its test and its vectors
+
+Added on 2026-11-16.
+
+| File | Source | Source commit | SHA-256 | Changes |
+|---|---|---|---|---|
+| `CHECKPOINTS.md` | `CHECKPOINTS.md` (requisition-aws) | `13f7729fcce3` | `5701a24e725d8bba31c458c6499b63b83983d5ea94a98c186acc1d86c68b02a3` | none |
+| `verifier/CHECKPOINTS.md` | `bench/holytrinity-v2/verifier/CHECKPOINTS.md` (requisition) | `61e49fea9938` | `5a5645d8f31bcf2b724c0a6350b2fc77a2f123cb11a6f600693d7f64c9303039` | none |
+
+The two documents are copied unchanged, so they name places in their source trees. Here:
+
+- `bin/lab-verify` is `verifier/lab-verify`; requisition-aws's `bin/verify_offline.py` is `verifier/verify_offline.py`;
+  `bench/holytrinity-v2/verifier/` is `verifier/`.
+- `verifier/CHECKPOINTS.md` also describes `verify_receipt.exs` and `verify_receipt_checkpoint.exs`, the Elixir
+  verifier of the source tree, and `CHECKPOINTS.md` names `bin/verify_chain.py`; none of the three is in this
+  repository.
+- `lab/checkpoint-vectors/` of the Requisition repository is `checkpoint-vectors/` here, without its provenance note.
+  `verifier/CHECKPOINTS.md` says that folder holds 26 cases; at the source commit it holds 32, and so does
+  `checkpoint-vectors/manifest.json` (measured). "The tests run all four verifiers" refers to the source tree's
+  tests; here `checkpoint-test.sh` runs `verifier/verify_offline.py`, which runs the other two Python files.
+
+`checkpoint-test.sh` was written for this repository. It runs `verifier/verify_offline.py` with the checkpoint flags
+of each case in `checkpoint-vectors/manifest.json` and compares the answer with the case's `expect`: exit 0 and the
+PASS line's checkpoint sentence for `ok`, exit 6 and `verdict: FAIL (the log checkpoint: <code>)` for a refusal.
+
+The vectors were made by the evaluation environment's own code, in one test run: the records by its signing path
+under a development Ed25519 key whose seed is fixed, the checkpoints and the key change by its log, the witness
+cosignatures by test witnesses written from the C2SP tlog-witness and tlog-cosignature specifications, and the
+inclusion and consistency proofs by its read routes; the forked history by the same log rolled back and given other
+records. Each negative case changes the producer's bytes in one stated way. The manifest's `expect` is the verdict
+every offline verifier must give, and `lab_expect` the evaluation environment's own judgement; they differ in one
+case, a policy naming an ML-DSA-44 witness, which the evaluation environment reads and these verifiers refuse by
+name. None of these records is a 13 November record, and their key is not one of the AWS KMS keys in
+`record/public-keys.json`. (Read in the source folder's provenance note.)
+
+Each file is byte-equal to the file of the same name under `lab/checkpoint-vectors/` of requisition at
+`61e49fea9938` (measured, by SHA-256):
+
+| File | Source path (requisition) | SHA-256 |
+|---|---|---|
+| `checkpoint-vectors/arguments.json` | `lab/checkpoint-vectors/arguments.json` | `af1566902a162074748d1b8901ab241e9191425177848f3dc6fd2beeaf3f1aa9` |
+| `checkpoint-vectors/lab-keys.json` | `lab/checkpoint-vectors/lab-keys.json` | `8983c19a52187ab93b57937cfe1f120cefec07325bd1b0e953572a81e1307b46` |
+| `checkpoint-vectors/manifest.json` | `lab/checkpoint-vectors/manifest.json` | `aa212eda0760238b338487f3b1b44d93d043873980e7ef4ba3323dd5fa04f2e5` |
+| `checkpoint-vectors/notes/a.cosigned` | `lab/checkpoint-vectors/notes/a.cosigned` | `59b9e1c7aba6de98e4a200889c32542dbdac28688bb144cf225b6c795cfb6cb4` |
+| `checkpoint-vectors/notes/a.new-key` | `lab/checkpoint-vectors/notes/a.new-key` | `becfad92d8293a6ed62894dde85f18cb92d9c4a5e4c8f9d9ccb29cdca3b32fe0` |
+| `checkpoint-vectors/notes/b.cosignature-time-over-max` | `lab/checkpoint-vectors/notes/b.cosignature-time-over-max` | `ca5bd1ddbc1211ad5ef2b0d77077a903b8218af6352beb0f2611c4ccbc3a6ebf` |
+| `checkpoint-vectors/notes/b.cosigned` | `lab/checkpoint-vectors/notes/b.cosigned` | `180eb8308a5753bbac3f4f005ae34a0764622b701a0400c2d6822c3bbffdda16` |
+| `checkpoint-vectors/notes/b.no-blank-line` | `lab/checkpoint-vectors/notes/b.no-blank-line` | `ce7e171117b0a24aa4106e974a5e9dec4e4dd38791ea473dc3083a5f0cf71856` |
+| `checkpoint-vectors/notes/b.one-witness` | `lab/checkpoint-vectors/notes/b.one-witness` | `1453a993531b38d08f660a1d4d89ee530e7aaf218b86c5a178116e1e11beaded` |
+| `checkpoint-vectors/notes/b.one-witness-twice` | `lab/checkpoint-vectors/notes/b.one-witness-twice` | `4506f51faa56a4a1ef24d9653b2dadfadf3a811892005b524ebafb6fa655530b` |
+| `checkpoint-vectors/notes/b.outsider-and-one` | `lab/checkpoint-vectors/notes/b.outsider-and-one` | `a37ce49a3b7b6dd7a758d8eb1da8c061a5972107074f90516d0b441bb9e37e84` |
+| `checkpoint-vectors/notes/b.three-witnesses` | `lab/checkpoint-vectors/notes/b.three-witnesses` | `0a30dd63196d71371773359bc72d12c229c96642cfc46ae480dc557c88c52476` |
+| `checkpoint-vectors/notes/b.witness-line-changed` | `lab/checkpoint-vectors/notes/b.witness-line-changed` | `95ad304d3cbf8fcf48afaf0d78d3a28b36e9168271847e558a565ae76701cd3a` |
+| `checkpoint-vectors/notes/c.cosigned` | `lab/checkpoint-vectors/notes/c.cosigned` | `95d7793793a46b8b417bd1ba35d6064905f6eb6c41d3ec2ffc4f2f96d10e5634` |
+| `checkpoint-vectors/notes/fork.cosigned` | `lab/checkpoint-vectors/notes/fork.cosigned` | `6fcae6133c7bb34cbfcc8a8c00a6b8d9b7cc6d3c3a4cf8c0b8cf92d0eb7c8a0c` |
+| `checkpoint-vectors/notes/fork.new-key` | `lab/checkpoint-vectors/notes/fork.new-key` | `2f373ada394cc7ac35b403bfb44c72654f6ae99bcd721b9a24979014e1d56de6` |
+| `checkpoint-vectors/notes/other-origin.log-note` | `lab/checkpoint-vectors/notes/other-origin.log-note` | `20a1bfac72832366d31ba0a707e150eda8e918899ef04d9e7a1692cacc0dfb44` |
+| `checkpoint-vectors/notes/other-origin.relabelled` | `lab/checkpoint-vectors/notes/other-origin.relabelled` | `732c38b1c12670319c4c8d6127309d44dcc93551c071ddeefa92aa602d4ea451` |
+| `checkpoint-vectors/policies/fork.policy` | `lab/checkpoint-vectors/policies/fork.policy` | `7e7d13c641d2c02b46f4a26f4478253dfa255c2830ecf4042be9ca5b70cff702` |
+| `checkpoint-vectors/policies/main.policy` | `lab/checkpoint-vectors/policies/main.policy` | `b77748d05eddc8661f6a69b8810b1f7cc03ada0f74f8386d99c7a51547f45015` |
+| `checkpoint-vectors/policies/mldsa44-witness.policy` | `lab/checkpoint-vectors/policies/mldsa44-witness.policy` | `bb69a219ed7caa9b08449e62a78e38ff182abc1a470c051165ade42dd9c6bbed` |
+| `checkpoint-vectors/policies/wrong-log-key.policy` | `lab/checkpoint-vectors/policies/wrong-log-key.policy` | `09f3c7fdfd7b6e13730dac724c37d9e011db6820c296580e5116731793e28b5f` |
+| `checkpoint-vectors/proofs/consistency-3-7.json` | `lab/checkpoint-vectors/proofs/consistency-3-7.json` | `f7261811454f1fdf5cb459245272d3cc2f3fddd6cb0f7ee68d4f4d044cc36d13` |
+| `checkpoint-vectors/proofs/consistency-3-8.json` | `lab/checkpoint-vectors/proofs/consistency-3-8.json` | `39e779cdb6de4c1ceffd05bfa42d28faad2a4f9652874079220233ef8dd93699` |
+| `checkpoint-vectors/proofs/consistency-7-8.json` | `lab/checkpoint-vectors/proofs/consistency-7-8.json` | `42897ae9c74d0184847f4ebd38c26dc9664b172123f565b9491443b20cf48d6b` |
+| `checkpoint-vectors/proofs/consistency-fork-3-7.json` | `lab/checkpoint-vectors/proofs/consistency-fork-3-7.json` | `e7b89eccf62d58e0abb6c3d1c26f449f5d91bfbddf7b8f18065a4abfc85b4785` |
+| `checkpoint-vectors/proofs/inclusion-fork-1-at-7.json` | `lab/checkpoint-vectors/proofs/inclusion-fork-1-at-7.json` | `cb4bb3f4b54fcff6eac8eda42c9f591636fc1268be5dca4b0d8ef88b665eb620` |
+| `checkpoint-vectors/proofs/inclusion-main-1-at-3.json` | `lab/checkpoint-vectors/proofs/inclusion-main-1-at-3.json` | `d85d46de7180afd836489d243df9b6eb9ac5cb0e3e72272b83ee94ea0df317f7` |
+| `checkpoint-vectors/proofs/inclusion-main-1-at-7.index-moved.json` | `lab/checkpoint-vectors/proofs/inclusion-main-1-at-7.index-moved.json` | `98189d99e37e6b7466f79d4445dccdab74790d3ece7b22b6a9ea03348d3c589d` |
+| `checkpoint-vectors/proofs/inclusion-main-1-at-7.json` | `lab/checkpoint-vectors/proofs/inclusion-main-1-at-7.json` | `b7da59f7376b01a5dadc83760727a3f2ca2b0b7f5e1f8ae23c24d7686c8b95dc` |
+| `checkpoint-vectors/proofs/inclusion-main-1-at-7.other-leaf-hash.json` | `lab/checkpoint-vectors/proofs/inclusion-main-1-at-7.other-leaf-hash.json` | `5acfdacea7060855f696e97cce84694d3dc378b8203afbfe1084a75410018c20` |
+| `checkpoint-vectors/proofs/inclusion-main-1-at-7.size-changed.json` | `lab/checkpoint-vectors/proofs/inclusion-main-1-at-7.size-changed.json` | `173c9bc19b79b7361cb659adfad902ad158feda6edc441b290dda0388fd679eb` |
+| `checkpoint-vectors/proofs/inclusion-main-1-at-7.truncated.json` | `lab/checkpoint-vectors/proofs/inclusion-main-1-at-7.truncated.json` | `48aa7b3bfa522046d667ce4a79079d169953b63a75e25af48302b5ba51f41ab2` |
+| `checkpoint-vectors/proofs/inclusion-main-1-at-8.json` | `lab/checkpoint-vectors/proofs/inclusion-main-1-at-8.json` | `37f0128170e0cf78d74f97b5d8e5fca37b1827b520f8f94076998e6a63213f0e` |
+| `checkpoint-vectors/proofs/inclusion-other-1.json` | `lab/checkpoint-vectors/proofs/inclusion-other-1.json` | `dc34cd4578f1ca8c2c05eb3b2dc699fa809b002f5a0bea060b2bb35a0eadf8cb` |
+| `checkpoint-vectors/records/fork-1.json` | `lab/checkpoint-vectors/records/fork-1.json` | `3c76a5b5950026e8c9bd74e40af3a79b1e02754b2a0e5d71ad094f7dd56cb6eb` |
+| `checkpoint-vectors/records/key-transition.endorsement-changed.json` | `lab/checkpoint-vectors/records/key-transition.endorsement-changed.json` | `dc17fbfbfce5ef85d1cb7e89accf88dc95ede6e910b605f7b1128791ece8bb3c` |
+| `checkpoint-vectors/records/key-transition.json` | `lab/checkpoint-vectors/records/key-transition.json` | `d6785e582d2a73e09e23e9c67050fce51a5f124604509f5391173e4e4bd8ad1d` |
+| `checkpoint-vectors/records/main-1.cosignature-not-base64.json` | `lab/checkpoint-vectors/records/main-1.cosignature-not-base64.json` | `6b244a95677b23ae92f6540c9fcdfc349bc8bef17895664cdd8d06737933f23d` |
+| `checkpoint-vectors/records/main-1.json` | `lab/checkpoint-vectors/records/main-1.json` | `1907203dd2890d6417050e84bc0e337b6cf5aea1cb96af36eefb1b35b7bef670` |
+| `checkpoint-vectors/records/main-2.json` | `lab/checkpoint-vectors/records/main-2.json` | `e737f54315381bbccb8d8d238bb7fb2c5ab32db9bdc841ad7d21396642273cf4` |
+| `checkpoint-vectors/records/other-1.json` | `lab/checkpoint-vectors/records/other-1.json` | `8f3cbd15a8343f9be313442cc3d0ca61e8ee894be7a5ccd61cf2c901c3a4ba5e` |
+
 ## The interoperability folder (`interop/`)
 
 Added after v0.1.0. Written for this repository: `interop/README.md`, `interop/build-cases.py`, `interop/run-all.sh`,
@@ -195,7 +338,7 @@ The test vectors are third-party files. Their sources, pinned commits and licenc
 `interop/vectors/PROVENANCE.md` is the provenance note of the vector files; it was reworded in four places for this repository: two
 referred to files outside this repository, and two used a term not defined here.
 
-No file from v0.1.0 changed except `README.md` (an `interop/` entry in the file list, a section "Other verifiers", a
+Up to the change of licence below, no file from v0.1.0 changed except `README.md` (an `interop/` entry in the file list, a section "Other verifiers", a
 licence line for the vectors, the description of Requisition worded as "an authority of record", and the paragraph on
 `DEGRADED (lab)` narrowed to the two records here), this file, `SHA256SUMS`, the three files
 `verifier/verify_offline.py`, `verifier/lab-verify` and `verifier/verify_receipt.py` (see "The verifier" above), and
@@ -211,7 +354,7 @@ For the v0.1.0 copy, before that tag was published:
 - The strict Ed25519 rules in `verify_receipt.py` and `lab-verify` were reviewed independently against 102
   adversarial inputs (small-order, mixed-order and non-canonical keys and signatures) with no acceptance.
 
-For the files of 2026-11-15 (the table above), measured on that date:
+For the files of 2026-11-15, measured on that date:
 
 - `sh verify.sh` exits 0 and prints the same output as with the v0.1.0 files, equal to `expected-output.txt`, on
   Python 3.11.15 and 3.12.3, in an empty environment (`env -i`).
@@ -224,6 +367,17 @@ For the files of 2026-11-15 (the table above), measured on that date:
   `ed25519_signature_canonical` of `verifier/lab-verify` answer the same on all 102 inputs as in v0.1.0. The inputs
   were given to these functions directly; the 95 of them that the review also ran through the command line were not
   run again.
+
+For the files of 2026-11-16 (the tables above), measured on that date:
+
+- `sh verify.sh` exits 0 and its output equals `expected-output.txt`, on Python 3.11.15 and 3.12.3, in an empty
+  environment (`env -i`).
+- `sh tamper-test.sh` exits 0, with the same output as with the files of 2026-11-15.
+- `sh checkpoint-test.sh` exits 0: 32 cases, 6 pass and 26 are refused by name, each as the manifest expects, on
+  Python 3.11.15 and 3.12.3, with the same output on both.
+- A system-call trace (`strace -f -e trace=network`) of `sh verify.sh`, and one of `sh checkpoint-test.sh`, shows no
+  network system calls.
+- `python3 -B -I tools/check-licence.py` passes.
 
 ## The licence from the next release (Apache License 2.0)
 
