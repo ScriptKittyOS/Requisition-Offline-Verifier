@@ -55,8 +55,9 @@ one byte too short or too long, and 3 have a signature of the wrong length; all 
 - AWS-LC is the library AWS names as the base of its post-quantum implementations. AWS's page on post-quantum
   cryptography (https://aws.amazon.com/security/post-quantum-cryptography) says: "At the foundation of these
   implementations is AWS-LC, our FIPS-140-3-validated cryptographic library". The record was signed with keys in AWS
-  KMS (`PROVENANCE.md`). AWS-LC's result therefore adds no independence from the signer: it shows that a library from
-  the same company as the signing service accepts the record. This folder does not say which library KMS uses internally.
+  KMS of the evaluation environment (`PROVENANCE.md`). AWS-LC's result therefore adds no independence from the
+  signer: it shows that a library from the same company as the signing service accepts the record. This folder does
+  not say which library KMS uses internally.
 - The others (mldsa-py, @noble/post-quantum, Go `crypto/mldsa`, Bouncy Castle, wolfSSL, Botan) are separate
   projects. This folder does not claim how much code, if any, they share with one another or with the libraries
   above.
