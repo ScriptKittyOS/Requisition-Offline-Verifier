@@ -1,17 +1,16 @@
-# Requisition offline verifier: a two-person approval, signed in AWS KMS with Ed25519 and ML-DSA-87
+# Requisition offline verifier: two signed records of one approval, from an evaluation environment with Ed25519 and ML-DSA-87 keys in AWS KMS
 
-This repository holds one signed approval record and the program that verifies it. Anyone can run the verification on their own machine, offline, with one command.
+This repository holds two signed records of one approval, a statement and a decision, and the program that verifies them. Anyone can run the verification on their own machine, offline, with one command.
 
-The record comes from a run on 13 November 2026 in which an AI agent asked to send a refund. [Requisition](#about-requisition), an authority of record for agent actions, held the request until two approvers had approved it, then signed its decision. Each signed record carries two signatures over the same bytes, both made inside AWS KMS:
+The records come from a run on 13 November 2026 in Requisition's evaluation environment, in which an AI agent asked to send a refund. [Requisition](#about-requisition), an authority of record for agent actions, held the request until it was approved by two separate accounts, then signed its decision.
 
-- **Ed25519** (RFC 8032), and
-- **ML-DSA-87** (FIPS 204), the post-quantum signature standard.
+Each of the two records carries two signatures over the same bytes, both made inside AWS KMS keys of the evaluation environment: Ed25519 (RFC 8032) and ML-DSA-87 (FIPS 204), a post-quantum signature standard.
 
-This is a proof of concept from an evaluation environment. [What a pass proves, and what it does not](#what-a-pass-proves-and-what-it-does-not) states the limits exactly.
+The evaluation environment is not part of a production release of Requisition. A production release refuses to start with the evaluation environment's settings, among them its AWS KMS keys, and it signs with Ed25519 alone. [What a pass proves, and what it does not](#what-a-pass-proves-and-what-it-does-not) states the limits exactly.
 
 ## Verify it
 
-Requirements: Python 3.11 or newer and a POSIX shell. Nothing to install. No network access is used.
+Requirements: Python 3 (tested with 3.11.15 and 3.12.3) and a POSIX shell. From a copy of this repository there is nothing to install. No network access is used.
 
 ```
 sh verify.sh
@@ -47,18 +46,33 @@ sha256sum -c SHA256SUMS
 
 On macOS use `shasum -a 256 -c SHA256SUMS`.
 
+## Install
+
+This verifier is not a package: it is the files of this repository. There are two ways to get them, and neither downloads and runs a script.
+
+- **A copy of this repository.** There is nothing to install; run `sh verify.sh` as above.
+- **The release's offline bundle**, for a machine without network access: `requisition-offline-verifier-<version>-offline.tar.gz`. It holds the release archive, its software bill of materials (CycloneDX) and a `SHA256SUMS` file. A digest inside the same bundle is not an anchor by itself, so anchor `SHA256SUMS` before you rely on it: check its detached signature `SHA256SUMS.asc` against the release key (see [Signed releases](PROVENANCE.md#signed-releases)), or compare its SHA-256 with the value published with the release. Then:
+
+```
+sha256sum -c SHA256SUMS
+tar -xzf requisition-offline-verifier-<version>.tar.gz
+cd requisition-offline-verifier-<version>
+sha256sum -c SHA256SUMS
+sh verify.sh
+```
+
+Two companion packages, `requisition-aws` for Python and `requisition-ts` for TypeScript, are prepared for PyPI and npm. They are not published yet. Neither is needed to run this verifier.
+
 ## What happened in the run
 
-1. An agent built with Strands Agents, running on a model in Amazon Bedrock, called a refund tool through Amazon Bedrock AgentCore Gateway: 12.50 USD to a customer account, reason "duplicate charge". The exact arguments are in [`record/arguments.json`](record/arguments.json).
-2. Requisition held the call. The agent was told the action was awaiting approval, and the tool did not run.
-3. Requisition signed a **statement** ([`record/statement.json`](record/statement.json), sequence 15). It fixes the hash of the action, a digest of what the approvers were shown, and the identifiers of the two approvers.
-4. Two approver accounts, neither of them the requester, approved.
-5. Requisition signed a **decision** ([`record/decision.json`](record/decision.json), sequence 16, verdict `allow`). It names the statement it follows and carries the same action hash.
-6. The agent's next call for the same action ran once. The refund tool is a stub: no money moved.
+1. An AI agent asked, through a tool call, to refund 12.50 USD to a customer account, reason "duplicate charge". The exact arguments are in [`record/arguments.json`](record/arguments.json).
+2. Requisition signed a **statement** ([`record/statement.json`](record/statement.json), sequence 15). It fixes the hash of the action, a digest of what the approvers were shown, and the identifiers of the two approver accounts.
+3. The request was approved by two separate accounts, neither of them the requester's.
+4. Requisition signed a **decision** ([`record/decision.json`](record/decision.json), sequence 16, verdict `allow`). It names the statement it follows and carries the same action hash.
 
 ## What the verifier checks
 
-`verify.sh` runs the same three checks on the statement and on the decision.
+`verify.sh` runs the same three checks on the statement and on the decision. Each check judges one record: its authenticity and its binding to the action.
 
 **1. The record is bound to this exact action.** The verifier recomputes a SHA-384 hash over a canonical form of the arguments and the action type, and compares it with the hash inside the signed bytes. It does the same for the digest of what the approvers were shown. An approval for "refund 12.50" cannot be presented as an approval for "refund 12.51".
 
@@ -73,32 +87,52 @@ The bare equation accepts some inputs it should not. Under the identity public k
 
 **3. The ML-DSA-87 signature is valid.** A second signature over the same bytes is checked against the ML-DSA-87 public key in the key file (pure ML-DSA, empty context string). `--require-pq` makes a missing or invalid post-quantum signature a failure. `--accept-signer kms` refuses a record whose key entry is not marked as a KMS key.
 
-The verifier reads three inputs and nothing else: the record, the arguments, and the public key file. It does not read the system clock.
+As `verify.sh` runs it, the verifier reads three inputs and nothing else: the record, the arguments, and the public key file. Check 4 below adds the inputs it names. The verifier does not read the system clock.
+
+**4. A log checkpoint of the evaluation environment, when you ask for one.** `verify.sh` does not run this check, and this repository holds no checkpoint of the evaluation environment for the two records above.
+
+Given the flags `--checkpoint`, `--inclusion-proof` and `--witness-policy`, and optionally the tree size you hold, `verify_offline.py` also checks what the transparency log of the evaluation environment says of a record, after the record's own signature has verified:
+
+- the record is included, by an RFC 9162 inclusion proof, under a checkpoint of the evaluation environment's log that the log key your policy names signed and that the witnesses your policy names cosigned, meeting its quorum;
+- a checkpoint larger than the tree size you hold is shown, by an RFC 9162 consistency proof, to extend your tree;
+- a checkpoint smaller than the tree size you hold, or of that size with another root, is refused.
+
+A pass of this check shows that the record is in the evaluation environment's log at the checkpoint's tree size, and that this tree is an append-only extension of the tree you hold. It does not show that the checkpoint is the newest the evaluation environment's log has made, that the action ran, or anything about another record.
+
+In the evaluation environment, witness cosignatures are what make a log that shows different histories to different parties detectable, and they do so for witness keys you configure yourself, at a threshold you choose, and as far as those witnesses are independent of the log. A cosignature of the evaluation environment shows what a key signed, never who holds the key.
+
+If you keep the tree size you hold in a held-state file (`--held-state`), the evaluation environment's checkpoint is compared with that file and the check holds only as far as the file does: a lost or reset file compares the next checkpoint with nothing, and a file restored from a backup, copied from an older machine or written by someone else compares it with that older or chosen state. The file carries no signature or checksum of its own.
+
+A refused checkpoint of the evaluation environment is named by its code, and `verify_offline.py` then ends with `verdict: FAIL (the log checkpoint: <code>)` and exit status 6. Not checked, in the evaluation environment: ML-DSA-44 witness cosignatures and a record whose own signature is ML-DSA-87 (both refused by name), the age of a checkpoint, and who runs a witness.
+
+Each check of the evaluation environment's log, each input, every refusal code and what is not checked are stated in [`verifier/CHECKPOINTS.md`](verifier/CHECKPOINTS.md); what `verify_offline.py` adds to them is in [`CHECKPOINTS.md`](CHECKPOINTS.md).
+
+To run the check on real inputs of the evaluation environment, run `sh checkpoint-test.sh`. It runs `verify_offline.py` with these flags over the 32 cases in [`checkpoint-vectors/`](checkpoint-vectors/manifest.json), which the evaluation environment's own code made, and compares each answer with the one the case's manifest entry expects: 6 cases pass and 26 are refused, each by its code. The last line is `RESULT: PASS (32 cases: 6 pass, 26 refused by name, each as expected)`. The vectors were made in a test run of the evaluation environment, under a development key and with test witnesses; they are not the 13 November records, and their key is not one of the AWS KMS keys of the evaluation environment named below. Each negative case changes the producer's bytes in one stated way. [`PROVENANCE.md`](PROVENANCE.md) says where they come from.
 
 ### About `DEGRADED (lab)` in the output
 
-The Ed25519 check prints `DEGRADED (lab)` and exits with code 5 for both records here, although both are valid. That is deliberate: this tool does not report full trust for a key that is not anchored in a trust root. The outer verifier expects exactly that answer for this profile and reports `verdict: PASS` only when all three checks hold.
+The Ed25519 check prints `DEGRADED (lab)` and exits with code 5 for both records here, although both are valid. That is deliberate: this tool does not report full trust for a key that is not anchored in a trust root. The outer verifier expects exactly that answer for this profile and reports `verdict: PASS` when all three checks hold, and not otherwise. With the flags of check 4 it also requires that check to hold.
 
 ## What a pass proves, and what it does not
 
 A pass proves that:
 
 - each record is bound to exactly the arguments and action type in `record/arguments.json`;
-- the Ed25519 signature and the ML-DSA-87 signature on each record are valid, over the same bytes, under the two KMS public keys in `record/public-keys.json`;
+- the Ed25519 signature and the ML-DSA-87 signature on each record are valid, over the same bytes, under the two public keys in `record/public-keys.json` that the key file marks as AWS KMS keys of the evaluation environment;
 - the records have not changed since they were signed.
 
 A pass does not prove the following, and this repository does not claim it.
 
-- **The keys are evaluation keys, not a trust root.** The key file is marked `"profile": "lab"`. You are trusting this repository to give you the right key file. A production deployment anchors its keys in a trust root that the relying party controls; that is not shown here.
-- **Key custody is asserted, not verified.** The key file says the two private keys are held in AWS KMS and cannot be exported. An offline check cannot confirm where a private key lives.
-- **The two approvals were not made by two independent people.** Both approver accounts were operated by the author for this run. The signed bytes say so themselves: `"hands": "one-person (G-301)"`. What the run shows is that the control held the action until two distinct approver accounts had approved it.
-- **Nothing proves the action was carried out.** The record is the decision. The refund tool was a stub.
-- **Signed times are not compared with the current time.** The records carry `occurred_at`, `not_after` and `exec_not_after`. The verifier checks that each key was valid at the record's signed time; it does not check whether a record has since expired. This is a historical record.
+- **The keys are evaluation keys, not a trust root.** Each entry of the key file is marked `"profile": "lab"`. You are trusting this repository to give you the right key file. A production deployment anchors its keys in a trust root that the relying party controls; that is not shown here.
+- **Key custody is asserted, not verified.** The key file says the two private keys, keys of the evaluation environment, are held in AWS KMS and cannot be exported. An offline check cannot confirm where a private key lives.
+- **Nothing proves the action was carried out.** The records are a statement and a decision. A pass says nothing about what happened after the decision.
+- **Signed times are not compared with the current time.** The statement carries `occurred_at`, `iat`, `nbf` and `exp`; the decision carries `occurred_at`, `not_after` and `exec_not_after`. The verifier checks that each key was valid at the record's signed `occurred_at`; it does not check whether a record has since expired. These are historical records.
+- **One record is judged at a time.** A pass says nothing about other records of the same environment: whether a later record exists, or whether a record was withheld.
 - **The server is not public.** You can verify the signed output of the run. You cannot reproduce the run.
 
 ## Keys
 
-Two keys in AWS KMS (`us-east-2`) signed both records. The account that holds them is used only for this public demonstration.
+Two AWS KMS keys of the evaluation environment, in `us-east-2`, signed both records.
 
 | | Ed25519 | ML-DSA-87 |
 |---|---|---|
@@ -128,17 +162,18 @@ Fields in the signed payload that a reader may ask about:
 | `metadata.sanctioners` | Identifiers of the two approver accounts |
 | `metadata.verdict` | The decision: `allow` |
 | `metadata.statement_id` (decision) | The `receipt_hash` of the statement this decision follows |
-| `metadata.kms_key_arn`, `metadata.cosign` | The KMS keys the record says signed it |
-| `metadata.hands` | `one-person (G-301)`: both approver accounts were operated by one person. `G-301` is the project's reference for that limit |
+| `metadata.kms_key_arn`, `metadata.cosign` | The AWS KMS keys of the evaluation environment that the record says signed it |
+| `metadata.hands` | The hands label, signed as `one-person (G-301)` |
 | `metadata.profile` | `lab`: the evaluation key profile |
 | `sequence`, `previous_hash` | Position in the environment's append-only record chain. The statement's `previous_hash` points to an earlier record that is not published here; the decision's points to the statement |
-| `metadata.principal`, `caller_id`, `grant_id`, `request_id`, `chain_scope` | Identifiers internal to the evaluation environment. They identify no person |
+| `metadata.principal`, `caller_id`, `grant_id`, `request_id`, `chain_scope` | Identifiers internal to the evaluation environment |
 
 ## Repository contents
 
 ```
 verify.sh              the one command
 tamper-test.sh         negative tests
+checkpoint-test.sh     check 4 over the evaluation environment's checkpoint vectors
 expected-output.txt    the output of verify.sh
 record/
   arguments.json       the arguments of the action
@@ -148,8 +183,11 @@ record/
 verifier/
   verify_offline.py    binds the record to the arguments; checks the ML-DSA-87 signature; runs lab-verify
   lab-verify           checks the record's kind, labels and key entry; runs verify_receipt.py
-  verify_receipt.py    checks the Ed25519 signature and the record hash
+  verify_receipt.py    checks the Ed25519 signature and the record hash; check 4
+  CHECKPOINTS.md       check 4: each check, input and refusal, and what is not checked
   vendor/mldsa.py      third-party ML-DSA (FIPS 204) verification, unmodified
+CHECKPOINTS.md         check 4: what verify_offline.py adds
+checkpoint-vectors/    32 cases for check 4: records, checkpoints, proofs, policies, and the manifest
 interop/
   README.md            what was measured with nine ML-DSA-87 verifiers, and what it does not show
   cases.tsv            260 cases built from the record and two sets of test vectors
@@ -157,9 +195,13 @@ interop/
   run-all.sh           runs every verifier it finds
   verifiers/           one folder per verifier: the harness and how to build and run it
   vectors/             the two test-vector files, their provenance and licences
+tools/
+  check-licence.py     checks the licence, the NOTICE, the source headers and the interop download pins
 PROVENANCE.md          where every file came from, with digests
 SHA256SUMS             SHA-256 of every file
-LICENSE                Requisition-Offline-Verifier Verification Licence 1.0
+LICENSE                Apache License 2.0
+NOTICE                 the copyright holder and the source of the NIST test vectors
+THIRD-PARTY.md         the files that keep their own licences
 ```
 
 The verifier uses the Python standard library and one vendored file, [`verifier/vendor/mldsa.py`](verifier/vendor/mldsa.py): mldsa-py 1.0.1 by Filippo Valsorda, pure Python, licensed CC0-1.0 OR 0BSD, copied unmodified. `verify_offline.py` refuses to load it unless its SHA-256 equals the pinned value. Its origin, digests and the test vectors it is checked against are in [`verifier/vendor/VENDORED.md`](verifier/vendor/VENDORED.md).
@@ -168,25 +210,27 @@ Tested with Python 3.11.15 and 3.12.3 on Linux. A system-call trace of `verify.s
 
 ## Other verifiers
 
-`verify.sh` checks the ML-DSA-87 signatures with one library, mldsa-py. The folder [`interop/`](interop/README.md) holds a case file built from this record and from two sets of public test vectors, and a harness for each of nine ML-DSA-87 verifiers: mldsa-py, pyca/cryptography, Erlang/OTP `crypto`, @noble/post-quantum, Go `crypto/mldsa`, Bouncy Castle, AWS-LC, wolfSSL and Botan. On 14 November 2026 each reported no disagreement with the expected result on the cases it ran. [`interop/README.md`](interop/README.md) gives the versions, the commands to repeat the runs, which of these libraries share code, and what the runs do not show.
+`verify.sh` checks the ML-DSA-87 signatures with one library, mldsa-py. The folder [`interop/`](interop/README.md) holds a case file built from this record and from two sets of public test vectors, and a harness for each of nine ML-DSA-87 verifiers: mldsa-py, pyca/cryptography, Erlang/OTP `crypto`, @noble/post-quantum, Go `crypto/mldsa`, Bouncy Castle, AWS-LC, wolfSSL and Botan. [`interop/README.md`](interop/README.md) records that in runs on 14 November 2026 each reported no disagreement with the expected result on the cases it ran, and gives the versions, the commands to repeat the runs, which of these libraries share code, and what the runs do not show.
 
 ## About Requisition
 
-Requisition is an authority of record for what AI agents and other automated actors are allowed to do. A consequential action is held until the people who must approve it have approved it, and every decision is recorded in a form that a third party can verify without access to the system that produced it. This repository shows that last property.
+Requisition is an authority of record for what AI agents and other automated actors are allowed to do. A consequential action is held until the approver accounts it requires have approved it, and the statements and decisions Requisition signs can be verified by a third party without access to the system that produced them. This repository shows that last property.
 
-An approval record for a consequential action may need to be relied on for many years. A record whose signature could be forged later is a record that could be rewritten later, which is the reason for the second, post-quantum signature.
+An approval record for a consequential action may need to be relied on for many years. A record whose signature could be forged later is a record that could be rewritten later. That is the reason for the second, post-quantum signature on the records here, which Requisition adds in its evaluation environment.
 
 The Requisition server is not open source. This verifier and these records are published so that the verification can be checked independently.
 
 ## Licence
 
-[Requisition-Offline-Verifier Verification Licence 1.0](LICENSE). In short: you may read everything here, run the verifier and the negative tests, run the unmodified verifier on other Requisition records, and publish what you find. Redistribution, modified versions, building the materials into a product, and training a model on them need written permission. The licence text governs; this summary does not.
+From this release, the files of this repository that are its own are licensed under the [Apache License 2.0](LICENSE), copyright Sudo Apt Holdings LLC (Script Kitty OS & Labs); see [`NOTICE`](NOTICE).
+
+Earlier releases keep the licence they were published under: v0.1.0 is under the Requisition-Offline-Verifier Verification Licence 1.0.
 
 The vendored ML-DSA library keeps its own licence: [`verifier/vendor/LICENSE.mldsa`](verifier/vendor/LICENSE.mldsa).
 
-The test vectors in `interop/vectors/` keep their own licences: [`LICENSE.nist-acvp-server`](interop/vectors/LICENSE.nist-acvp-server) for the NIST ACVP file and [`LICENSE.wycheproof`](interop/vectors/LICENSE.wycheproof) for the Wycheproof file.
+The test vectors in `interop/vectors/` keep their own licences: [`LICENSE.nist-acvp-server`](interop/vectors/LICENSE.nist-acvp-server) for the NIST ACVP file and [`LICENSE.wycheproof`](interop/vectors/LICENSE.wycheproof) for the Wycheproof file. [`THIRD-PARTY.md`](THIRD-PARTY.md) lists every file that keeps its own licence.
 
-Releases are tagged and signed. `git verify-tag v0.1.0` checks the signature; the licence gives the key fingerprint.
+The release tag v0.1.0 is signed; [Signed releases](PROVENANCE.md#signed-releases) says how to check a release tag and which key signs it.
 
 ## Reporting a problem
 
