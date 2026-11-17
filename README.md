@@ -195,6 +195,7 @@ interop/
   run-all.sh           runs every verifier it finds
   verifiers/           one folder per verifier: the harness and how to build and run it
   vectors/             the two test-vector files, their provenance and licences
+elixir/                the Elixir receipt verifier, verify_receipt.exs, as the source of a Hex package
 tools/
   check-licence.py     checks the licence, the NOTICE, the source headers and the interop download pins
 PROVENANCE.md          where every file came from, with digests

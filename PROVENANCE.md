@@ -325,6 +325,29 @@ Each vector file of the evaluation environment is byte-equal to the file of the 
 | `checkpoint-vectors/records/main-2.json` | `lab/checkpoint-vectors/records/main-2.json` | `e737f54315381bbccb8d8d238bb7fb2c5ab32db9bdc841ad7d21396642273cf4` |
 | `checkpoint-vectors/records/other-1.json` | `lab/checkpoint-vectors/records/other-1.json` | `8f3cbd15a8343f9be313442cc3d0ca61e8ee894be7a5ccd61cf2c901c3a4ba5e` |
 
+## The Elixir package source (`elixir/`)
+
+Added for the next release. `elixir/` is the source of a Hex package, `requisition_receipt_verifier`: the Elixir
+receipt verifier `verify_receipt.exs` and its log checkpoint module, as a library and a command. It is not run by
+`verify.sh`. Its own `README.md` and `SOURCES.md` say how it is built and where its code comes from.
+
+| File | Source | Source commit | SHA-256 | Changes |
+|---|---|---|---|---|
+| `elixir/sources/verify_receipt.exs` | `bench/holytrinity-v2/verifier/verify_receipt.exs` (requisition) | `223774d6` | `d8b618dc6fadd7557981fd62e7e3520708b741085ff9cc6c1569b8fb5f4fdbe0` | none |
+| `elixir/sources/verify_receipt_checkpoint.exs` | `bench/holytrinity-v2/verifier/verify_receipt_checkpoint.exs` (requisition) | `223774d6` | `b60a950096ba703050fa553577245703980d30f4c0fad97db918353af64aac28` | none |
+| `elixir/VERDICTS.md` | `bench/holytrinity-v2/verifier/VERDICTS.md` (requisition) | `223774d6` | `fce4eab0f702e2aee0f6c31a512d2ddcc18c292a3d9dc89e5d952d2f885e49da` | none |
+| `elixir/CHECKPOINTS.md` | `bench/holytrinity-v2/verifier/CHECKPOINTS.md` (requisition) | `223774d6` | `326b2d2212b4a47ea72b3d5d7cc68aafeca3056d221082d52a8edc7a51645d8c` | none |
+| `elixir/LICENSE` | this repository's `LICENSE` | | `cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30` | none |
+
+`elixir/lib/verify_receipt.ex`, `elixir/lib/log_checkpoint.ex` and `elixir/lib/requisition_receipt_verifier/cli.ex`
+are made from the two scripts by `elixir/scripts/derive.exs`, mechanically; `elixir/SOURCES.md` states each step.
+The package's tests (`elixir/test/package_test.exs`) pin the two scripts by SHA-256 and compare each derived file
+with what `derive.exs` makes, byte for byte. The other files of the folder (`mix.exs`, the Mix task, `README.md`,
+`SOURCES.md`, `NOTICE`, `.gitignore`, `derive.exs`, the tests) were written for the package.
+
+For the files of 2026-11-16, measured on that date: `mix test` in `elixir/` gives 7 tests, 0 failures; `mix
+hex.build` from two fresh copies of this repository gives the same tarball, byte for byte.
+
 ## The interoperability folder (`interop/`)
 
 Added after v0.1.0. Written for this repository: `interop/README.md`, `interop/build-cases.py`, `interop/run-all.sh`,
