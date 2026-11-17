@@ -9,7 +9,7 @@ defmodule RequisitionReceiptVerifier.MixProject do
     [
       app: :requisition_receipt_verifier,
       version: @version,
-      elixir: "~> 1.17",
+      elixir: "~> 1.18",
       start_permanent: false,
       deps: [],
       description:
@@ -18,7 +18,7 @@ defmodule RequisitionReceiptVerifier.MixProject do
           "No dependency beyond Elixir and OTP; no network.",
       package: package(),
       escript: [main_module: RequisitionReceiptVerifier.CLI, name: "verify_receipt"],
-      source_url: "https://github.com/ScriptKittyOS/HolyTrinity-Benchmark"
+      source_url: "https://github.com/ScriptKittyOS/Requisition-Offline-Verifier"
     ]
   end
 

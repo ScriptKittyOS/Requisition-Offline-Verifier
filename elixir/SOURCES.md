@@ -1,13 +1,14 @@
 # Where this package's code comes from
 
-The package's three library files are derived mechanically, by `scripts/derive.exs`, from two scripts of the
-Requisition receipt verifier. The scripts are kept unchanged in `sources/` and pinned by SHA-256 in
-`test/package_test.exs`:
+The package's three library files are derived mechanically, by `elixir/scripts/derive.exs`, from two scripts of the
+Requisition receipt verifier. The scripts are kept unchanged in `elixir/sources/` and pinned by SHA-256 in
+`elixir/test/package_test.exs`. These paths are in the Requisition Offline Verifier repository
+(https://github.com/ScriptKittyOS/Requisition-Offline-Verifier); the Hex package does not carry them.
 
 | script | SHA-256 |
 |---|---|
-| `sources/verify_receipt.exs` | `d8b618dc6fadd7557981fd62e7e3520708b741085ff9cc6c1569b8fb5f4fdbe0` |
-| `sources/verify_receipt_checkpoint.exs` | `b60a950096ba703050fa553577245703980d30f4c0fad97db918353af64aac28` |
+| `elixir/sources/verify_receipt.exs` | `d8b618dc6fadd7557981fd62e7e3520708b741085ff9cc6c1569b8fb5f4fdbe0` |
+| `elixir/sources/verify_receipt_checkpoint.exs` | `b60a950096ba703050fa553577245703980d30f4c0fad97db918353af64aac28` |
 
 | package file | made from |
 |---|---|
@@ -26,5 +27,5 @@ package name, in code and comments; no other text changes:
 | `LogCheckpoint` | `RequisitionReceiptVerifier.LogCheckpoint` |
 | `VerifyReceipt` | `RequisitionReceiptVerifier.VerifyReceipt` |
 
-To check a copy: `elixir scripts/derive.exs --write` in this folder, then `git diff -- lib` shows no change; the tests
-do the same comparison (`mix test`).
+To check a copy, in the `elixir/` folder of that repository: `elixir scripts/derive.exs --write`, then
+`git diff -- lib` shows no change; the tests do the same comparison (`mix test`).
