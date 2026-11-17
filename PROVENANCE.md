@@ -244,7 +244,7 @@ Added on 2026-11-16.
 | Document on the evaluation environment's log checkpoint check | Source | Source commit | SHA-256 | Changes |
 |---|---|---|---|---|
 | `CHECKPOINTS.md` | `CHECKPOINTS.md` (requisition-aws) | `13f7729fcce3` | `5701a24e725d8bba31c458c6499b63b83983d5ea94a98c186acc1d86c68b02a3` | none |
-| `verifier/CHECKPOINTS.md` | `bench/holytrinity-v2/verifier/CHECKPOINTS.md` (requisition) | `61e49fea9938` | `5a5645d8f31bcf2b724c0a6350b2fc77a2f123cb11a6f600693d7f64c9303039` | none |
+| `verifier/CHECKPOINTS.md` | `bench/holytrinity-v2/verifier/CHECKPOINTS.md` (requisition) | `223774d6` | `326b2d2212b4a47ea72b3d5d7cc68aafeca3056d221082d52a8edc7a51645d8c` | none |
 
 The two documents are copied unchanged, so they name places in their source trees. Here:
 
@@ -255,8 +255,10 @@ The two documents are copied unchanged, so they name places in their source tree
   repository.
 - `lab/checkpoint-vectors/` of the Requisition repository, the evaluation environment's vectors, is
   `checkpoint-vectors/` here, without its provenance note.
-  `verifier/CHECKPOINTS.md` says that folder of the evaluation environment's vectors holds 26 cases; at the source commit it holds 32, and so does
-  `checkpoint-vectors/manifest.json` (measured). "The tests run all four verifiers" refers to the source tree's
+  `verifier/CHECKPOINTS.md` says that folder of the evaluation environment's vectors holds 32 cases, 6 that pass
+  and 26 that are refused, and so does `checkpoint-vectors/manifest.json` (measured). The copy of 2026-11-16 at
+  `61e49fea` said 26 cases; its source was corrected at `a4f5e4cb`, and this copy is the corrected file. The vector
+  files did not change between `61e49fea` and `223774d6` (measured, `git diff`). "The tests run all four verifiers" refers to the source tree's
   tests; here `checkpoint-test.sh` runs `verifier/verify_offline.py`, which runs the other two Python files, over the evaluation
   environment's vectors.
 

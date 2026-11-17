@@ -144,6 +144,6 @@ last `log checkpoint: all checks held: inclusion, witness quorum, not older than
 
 ## Vectors
 
-`lab/checkpoint-vectors/` in the Requisition repository holds 26 cases made by the evaluation environment's own code
-(its `PROVENANCE.md` says how), each with the verdict every verifier above must give. The tests run all four
+`lab/checkpoint-vectors/` in the Requisition repository holds 32 cases made by the evaluation environment's own code
+(its `PROVENANCE.md` says how): 6 that pass and 26 that are refused, each with the verdict every verifier above must give. The tests run all four
 verifiers over every case.
