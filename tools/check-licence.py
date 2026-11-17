@@ -27,7 +27,7 @@ SPDX = "SPDX-License-Identifier: Apache-2.0"
 COPYRIGHT = "Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)"
 # The Apache License 2.0 text, byte for byte as the Apache Software Foundation distributes it (11,358 bytes).
 APACHE_2_0_SHA256 = "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
-SOURCE_SUFFIXES = {".py", ".sh", ".c", ".cpp", ".java", ".go", ".mjs", ".escript"}
+SOURCE_SUFFIXES = {".py", ".sh", ".c", ".cpp", ".java", ".go", ".mjs", ".escript", ".ex", ".exs"}
 HEADER_LINES = 5
 COMMENT_LEADERS = ("//", "#", "%%", "%")
 EXEMPT = {
