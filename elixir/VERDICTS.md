@@ -456,9 +456,9 @@ Which of these could be in the signed bytes of a CHAIN RECEIPT the issuing syste
 (its lab records are the paragraph after this list). Not the instant kinds: it stamps
 `occurred_at` from its own clock. Not a number beyond a double: its runtime has none. Not the
 negative zero with an exponent: canonical versions 2 and 3, the forms of its chain receipts, write every float with a
-fraction. From the G-274 float series on (2026-11-16) the issuing system signs no float: it refuses one by name
+fraction. Since the change of 2026-11-16 the issuing system signs no float: it refuses one by name
 (`float_refused`) at every door that signs or hashes into signed bytes, and canonical version 4 refuses a float
-itself; a chain receipt signed before that series may hold a float, in the form versions 2 and 3 write. Three kinds
+itself; a chain receipt signed before that change may hold a float, in the form versions 2 and 3 write. Three kinds
 could:
 
 - *A member name written twice*, before 2026-09-16. Since that date its encoder refuses an object
@@ -491,8 +491,8 @@ None of the three is known. No production database was searched for one.
 A LAB RECORD of the execute API is not covered by the list above ("The rule": the issuing system
 does not apply this rule to it). Read in the code of its builder on 2026-11-14: its metadata may
 hold text, integers within plus or minus 2^53 - 1, booleans, null, lists and objects with text
-names, so it cannot hold an integer of more than 1024 characters, any float (refused by name, `float_refused`, from
-the G-274 float series on), or one name twice;
+names, so it cannot hold an integer of more than 1024 characters, any float (refused by name, `float_refused`, since
+the change of 2026-11-16), or one name twice;
 its instant is the clock's or a calendar instant the builder passes. That check does not bound
 NESTING. As far as the code reads, the builder would still sign a lab record nested beyond 64
 today (whether any caller of the builder can hand it one was not examined): this verifier answers
