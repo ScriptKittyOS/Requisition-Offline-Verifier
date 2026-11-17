@@ -83,8 +83,8 @@ THE CHECKS, in order (an accusation needs standing, so it waits until the key fi
      two-account, two-passkey (G-301); any other is lab_label_missing), or, for a record a lab KMS seat
      signed, the same four with signer kms. The stronger hands value must carry two distinct sanctioners
      and two distinct approval_records, and no record may carry hands_evidence (else lab_hands_unsupported);
-     a record that passes with it is said to rest on those APPROVE records, NOT re-derived here and NOT
-     two people; the value is never upgraded;
+     a record that passes with it is said to rest on those two signed members, NOT re-derived here and
+     NOT two people; the value is never upgraded;
   7. the signed metadata.key_id equals the envelope's key_id, and it is one of the two lab
      dev key ids (LabSigner's seat table; a pin compares the two); or, for signer kms: the key
      file's entry says signer kms, the key id is KMS_KEY_ID_PREFIX[the entry's algorithm] + a
@@ -753,9 +753,8 @@ def _distinct_strings(value, length):
 def check_hands(metadata):
     """The signed hands value is one of HANDS_VALUES (checked with the labels). No record carries hands_evidence (a name
     the producer never signs). The stronger value must carry, by shape, the members it rests on: two distinct sanctioners
-    and two distinct approval_records (the APPROVE records, which name each passkey). This file cannot re-derive the value
-    (that needs the seat and enrolment records); it refuses a record whose signed members cannot even support it, and
-    never upgrades one."""
+    and two distinct approval_records. This file cannot re-derive the value; it refuses a record whose signed members
+    cannot even support it, and never upgrades one."""
     if "hands_evidence" in metadata:
         refuse("the record carries hands_evidence, a member no lab record signs.", verdict_code="lab_hands_unsupported")
     hands = metadata.get("hands")
@@ -776,9 +775,8 @@ def hands_line(signed):
     hands = metadata.get("hands")
     if hands == HANDS_VALUES[0]:
         return ""
-    return ("\nsigned hands: %s, resting on the APPROVE records %s and each passkey's one enrolment in this chain; NOT "
-            "re-derived here (the seat and enrolment records are needed for that); it shows two accounts and two enrolled "
-            "passkeys, NOT that two people held them" % (hands, ", ".join(metadata["approval_records"])))
+    return ("\nsigned hands: %s, resting on the signed sanctioners and approval_records %s; NOT re-derived here; it "
+            "shows two accounts, NOT that two people held them" % (hands, ", ".join(metadata["approval_records"])))
 
 
 def signed_verdict(signed):

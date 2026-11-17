@@ -26,10 +26,14 @@ history.
 | File | Source path | Source commit | SHA-256 | Changes |
 |---|---|---|---|---|
 | `verifier/verify_offline.py` | `bin/verify_offline.py` (requisition-aws) | `13f7729fcce3` | `813edaf013670a23d3303415eeb6b821ac475cb55c196a303096a33e8b752e24` | none |
-| `verifier/lab-verify` | `bin/lab-verify` (requisition) | `61e49fea9938` | `95a5eff63b518a80a653d8a26ee16ebd86f2d1aed72e14f9e7037fbd1d56b097` (source file: `293cec59a879a89861473a9dbfff0ce45098532b8f194e963a06033de55abba3`) | one: see below |
+| `verifier/lab-verify` | `bin/lab-verify` (requisition) | see the note below the table | `6bd607ba2a8efc75604a599569bbda03906fa24ed48bdbbb24187b6305de2f3b` (source file: `deef717c897d2daa17597ebe7f2cca5ff96b4cef8b9b6875cc1e05b41d9b83f1`) | one: see below |
 | `verifier/verify_receipt.py` | `bench/holytrinity-v2/verifier/verify_receipt.py` (requisition) | `61e49fea9938` | `162c2e4d1ee0a129e2cc6899e638ad67847896eb3605ba3338089c8906213539` | none |
 | `verifier/vendor/mldsa.py` | mldsa-py 1.0.1, `src/mldsa/mldsa.py` | upstream release | `0e8885d01ed76919f3152caa160f90949c03efc6a3748865aaf4beb2737c7a4a` | none |
 | `verifier/vendor/LICENSE.mldsa` | mldsa-py 1.0.1, `LICENSE` | upstream release | `74b344a43288283ca7896b38d859bd6b91035110bb9c69856afbc60a01ff65e4` | none |
+
+**The source of `verifier/lab-verify`.** It is `bin/lab-verify` of the requisition repository after the change of
+2026-11-16 that reworded how it describes the hands label (below), the source file with the SHA-256 in the table. That
+change follows `223774d6` in requisition's main history; its commit is identified here by the file's SHA-256.
 
 **The one change.** In its source tree `lab-verify` finds `verify_receipt.py` at
 `../bench/holytrinity-v2/verifier/`. Here the two files sit in one directory, so the constant that holds
@@ -225,8 +229,8 @@ check a record against a checkpoint of the evaluation environment's log. `verifi
 - The signed `hands` label of a record of the evaluation environment may carry either of two values, `one-person (G-301)` and `two-account, two-passkey
   (G-301)`; any other value is refused as before, exit 1, `lab_label_missing`, and the message lists the two values.
   A record signed with the second value must carry two distinct `sanctioners` and two distinct `approval_records`,
-  else exit 1, `lab_hands_unsupported`; when it passes, its answer adds a line saying what that value rests on and
-  that it is not re-derived here. A record that carries a `hands_evidence` member is refused, exit 1,
+  else exit 1, `lab_hands_unsupported`; when it passes, its answer adds a line saying that the value rests on the
+  signed `sanctioners` and `approval_records` and that it is not re-derived here. A record that carries a `hands_evidence` member is refused, exit 1,
   `lab_hands_unsupported`. The file of 2026-11-15 refused every value but the first, exit 1, `lab_label_missing`.
   (Read in the code; both records here carry the first value, and their answers did not change.)
 - The message of `lab_label_missing` no longer names an internal decision; it says that every lab record is signed
