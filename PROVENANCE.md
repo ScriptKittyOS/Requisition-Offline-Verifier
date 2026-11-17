@@ -328,10 +328,11 @@ Each vector file of the evaluation environment is byte-equal to the file of the 
 ## The Elixir package source (`elixir/`)
 
 Added for the next release. `elixir/` is the source of a Hex package, `requisition_receipt_verifier`: the Elixir
-receipt verifier `verify_receipt.exs` and its log checkpoint module, as a library and a command. It is not run by
+receipt verifier `verify_receipt.exs` and its module for the evaluation environment's log checkpoint check, as a
+library and a command. It is not run by
 `verify.sh`. Its own `README.md` and `SOURCES.md` say how it is built and where its code comes from.
 
-| File | Source | Source commit | SHA-256 | Changes |
+| Package file (its checkpoint files concern the evaluation environment's log) | Source | Source commit | SHA-256 | Changes |
 |---|---|---|---|---|
 | `elixir/sources/verify_receipt.exs` | `bench/holytrinity-v2/verifier/verify_receipt.exs` (requisition) | `223774d6` | `d8b618dc6fadd7557981fd62e7e3520708b741085ff9cc6c1569b8fb5f4fdbe0` | none |
 | `elixir/sources/verify_receipt_checkpoint.exs` | `bench/holytrinity-v2/verifier/verify_receipt_checkpoint.exs` (requisition) | `223774d6` | `b60a950096ba703050fa553577245703980d30f4c0fad97db918353af64aac28` | none |
