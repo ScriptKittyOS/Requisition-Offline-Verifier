@@ -50,7 +50,9 @@ Yours, the relying party's, never taken from the bundle under test:
 
 - `--witness-policy FILE`: in the C2SP policy format (`log <vkey>`, `witness <name> <vkey>`, `group <name>
   <N|any|all> <member>...`, `quorum <name|none>`, `#` comments), the log key, the keys of the evaluation
-  environment's witnesses you rely on, the groups and the quorum. At least one `log` line is required.
+  environment's witnesses you rely on, the groups and the quorum. At least one `log` line is required. A group's N is
+  a decimal from 1 to the number of its members, written with no sign and no leading zero (`+2` and `02` are usage
+  errors).
 - `--held-size N --held-root ROOT`: the largest tree size you hold and its base64 SHA-256 root.
 - `--held-state FILE`: instead of the two flags, a file you keep, `{"origin": ..., "root": ..., "size": ...}`. An
   absent file means nothing is held, and the output says so.
@@ -74,9 +76,21 @@ From the bundle under test:
   checkpoint's (`GET /v1/log/consistency`).
 - `--key-transition FILE`: the log's signed key-transition record, when the log's key changed (served with its
   inclusion proof).
+- `--held-to-transition-proof FILE`: `{"hash": "sha256", "old", "new", "proof": [base64...]}` from your held size to
+  the key-transition record's previous size (`GET /v1/log/consistency`), when the size you hold is below it.
 
-The checkpoint, the inclusion proof and the policy go together. A held size needs its root, and a consistency proof
-needs a held size. Anything else is a usage error (exit 2).
+The checkpoint, the inclusion proof and the policy go together. A held size needs its root, a consistency proof needs a
+held size, and a proof to the transition point needs a held size and the key-transition record. Anything else is a
+usage error (exit 2).
+
+A file given to one of these flags is given, whatever JSON value it holds. A file that holds `false`, `null`, `0`,
+`""` or `[]` is a proof or a key-transition record of the wrong form and is refused as one
+(`checkpoint_proof_malformed`, `checkpoint_transition_unendorsed`; a held-state file of that form is a usage error);
+it is never taken for the flag left out. A member written as `null` is present in the same way: a proof's `hash` is
+absent or `"sha256"`, so `"hash": null` is `checkpoint_proof_malformed`; a `leaf_hash` that is written must be the
+record's leaf hash (`checkpoint_inclusion_invalid`); and the record's `cosignature`, where it is written, is the
+base64 text of the co-signature or an object whose `signature` is that text, so `null`, `{}` and
+`{"signature": null}` are `checkpoint_leaf_malformed`.
 
 **A key change.** A checkpoint signed by a key your policy does not name is refused, unless the log's key-transition
 record is given. That record must name the checkpoint's origin and carry the old key's Ed25519 endorsement of the
@@ -84,8 +98,12 @@ new key, over `0x00 || "requisition.lab.log.key_transition.v0\n" || origin "\n" 
 previous root "\n" || base64 new key "\n"`. The old key must be a log key your policy names. The endorsed new key
 then stands in for it, and only from the point the old key endorsed it at: a checkpoint it signs must be at least the
 record's previous checkpoint size (else `checkpoint_before_transition`), and at that size must carry the record's
-previous root (else `checkpoint_transition_root_mismatch`). If the tree size you hold is below that point, check 2 runs
-from the transition point instead: the consistency proof must start at the record's previous size and root.
+previous root (else `checkpoint_transition_root_mismatch`). If the tree size you hold is below that point, two RFC 9162
+consistency proofs are needed. `--held-to-transition-proof` must show that the tree at the record's previous size and
+root extends your tree (else `checkpoint_consistency_unproven` when it is not given, `checkpoint_consistency_invalid`
+when it does not verify): the old key's endorsement of that point does not show it. Check 2 then runs from the
+transition point: `--consistency-proof` must start at the record's previous size and root. If the tree size you hold is
+that point, the record's previous root must be your root (else `checkpoint_split_view_at_held_size`).
 
 ## Refusals
 
@@ -108,16 +126,19 @@ log's account of it. The last line names the code:
 - `checkpoint_before_transition`: the checkpoint the new key signed is smaller than the point the old key endorsed
   it at.
 - `checkpoint_transition_root_mismatch`: the checkpoint the new key signed has that point's size and another root.
-- `checkpoint_proof_malformed`: a proof is not an object over the SHA-256 tree, its sizes are not the checkpoint's
-  (and your held size), or its hashes are not base64 SHA-256.
+- `checkpoint_proof_malformed`: a proof is not an object over the SHA-256 tree, its sizes are not those of the
+  evaluation environment's checkpoint (and your held size, or the transition point's), or its hashes are not base64
+  SHA-256.
 - `checkpoint_leaf_malformed`: the record's signature or co-signature is not canonical base64 under 65,536 bytes.
 - `checkpoint_inclusion_invalid`: the proof's leaf hash is not this record's, or the proof does not take the
   record's leaf to the checkpoint's root.
 - `checkpoint_older_than_held`: the checkpoint's size is below the size you hold.
 - `checkpoint_split_view_at_held_size`: the checkpoint has the size you hold and a different root.
-- `checkpoint_consistency_unproven`: the checkpoint is larger than the size you hold and no consistency proof is
-  given.
-- `checkpoint_consistency_invalid`: the consistency proof does not show the checkpoint's tree extending yours.
+- `checkpoint_consistency_unproven`: the evaluation environment's checkpoint is larger than the size you hold and no
+  consistency proof is given; or the size you hold is below a key transition's point and no proof from your tree to
+  that point is given.
+- `checkpoint_consistency_invalid`: the consistency proof does not show the evaluation environment's checkpoint tree
+  extending yours, or the proof to a key transition's point does not show the endorsed tree extending yours.
 
 `bin/lab-verify` passes these through unchanged. A record whose own signature is ML-DSA-87 (the evaluation
 environment's post-quantum seat) takes `bin/lab-verify`'s other path, where `verify_receipt.py` does not run, so the
@@ -137,13 +158,16 @@ last `log checkpoint: all checks held: inclusion, witness quorum, not older than
   `verify_offline.py`: refused by name.
 - Whether the checkpoint is the log's newest, or how old it is: cosignature times are not compared with any clock.
 - That the key-transition record itself is included in the log, or its own signature by the new key. The old key's
-  endorsement is what is checked. When the tree size you hold is below the transition point, that your tree extends to the
-  transition point is not checked: the old key's endorsement of that point stands in for it.
+  endorsement is what is checked.
+- When the evaluation environment's checkpoint is larger than the transition point and the tree size you hold is above
+  that point, or nothing is held, the root the key-transition record names for that point: it is compared with nothing,
+  and the checkpoint is checked against your tree alone (or against no tree). A checkpoint of the evaluation environment
+  at the point must carry that root (`checkpoint_transition_root_mismatch`), whatever you hold.
 - Who runs a witness of the evaluation environment, or whether those witnesses are independent of the log or of each
   other.
 
 ## Vectors
 
-`lab/checkpoint-vectors/` in the Requisition repository holds 32 cases made by the evaluation environment's own code
-(its `PROVENANCE.md` says how): 6 that pass and 26 that are refused, each with the verdict every verifier above must give. The tests run all four
+`lab/checkpoint-vectors/` in the Requisition repository holds 39 cases made by the evaluation environment's own code
+(its `PROVENANCE.md` says how): 6 that pass and 33 that are refused, each with the verdict every verifier above must give. The tests run all four
 verifiers over every case.

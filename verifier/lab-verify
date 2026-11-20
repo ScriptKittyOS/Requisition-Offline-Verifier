@@ -3,9 +3,10 @@
 # Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 """bin/lab-verify -- check a Requisition lab record offline. It never reports trust.
 
-    python3 -I bin/lab-verify --receipt RECORD.json --registry LAB-KEYS.json --act-hash HEX [--accept-signer LABEL]... [--cosignature-checked-by-caller]
+    python3 -I bin/lab-verify --receipt RECORD.json --registry LAB-KEYS.json --act-hash HEX [--accept-signer LABEL]... [--cosignature-checked-by-caller] [--at TIME]
         [--checkpoint NOTE --inclusion-proof PROOF.json --witness-policy POLICY [--held-size N --held-root ROOT |
-         --held-state FILE [--write-held-state]] [--consistency-proof PROOF.json] [--key-transition RECORD.json]]
+         --held-state FILE [--write-held-state]] [--consistency-proof PROOF.json]
+         [--key-transition RECORD.json [--held-to-transition-proof PROOF.json]]]
 
 RECORD.json is a lab record's four-field envelope (signature, key_id, signed_payload,
 receipt_hash), as POST /v1/execute answers it under "decision" and GET /v1/sanction-requests/:id
@@ -16,8 +17,8 @@ WHAT A LAB RECORD IS, AND WHY THIS NEVER SAYS "VERIFIED". A lab record is a lega
 receipt signed by a lab key: a DEV key held in the app's environment, or a lab KMS key (below).
 The best it can be is DEGRADED (lab): a lab key, legacy
 format, not a trust root. So a record that passes every check here exits 5 (on the Ed25519 path a CEASE
-record, which authorises nothing, exits 0: see EXIT CODES), and the unchanged verifier's exit 0 is never
-quoted without this verdict.
+record, which authorises nothing, exits 0; on the ML-DSA-87 path, where no signature is checked, 7: see EXIT
+CODES), and the unchanged verifier's exit 0 is never quoted without this verdict.
 
 THE TWO PATHS, chosen by the lab key file's entry for the record's key_id (its "algorithm"; an entry
 without one, or with any other value, is refused: default deny):
@@ -32,7 +33,8 @@ without one, or with any other value, is refused: default deny):
   * mldsa87 -- verify_receipt.py is NOT run: it checks Ed25519 only, by its own rule (its
     THE RULE THIS FILE BOUNDS), and requires a 32-byte key. Python's standard library has no
     ML-DSA, so this file checks the record's bytes, binding and labels and the key entry's own
-    integrity, never the signature, and exits 5 lab_signature_unchecked_mldsa87, saying so. The
+    integrity, never the signature, and exits 7 lab_signature_unchecked_mldsa87, saying so: a status of
+    its own, neither 0 nor 5, so a caller that branches on the status never takes it for a checked pass. The
     signature is checked by mix requisition.lab.verify_mldsa87 ENVELOPE --keys LAB-KEYS.json (Erlang
     :crypto over OpenSSL 3.5; not an independent implementation).
 
@@ -62,9 +64,14 @@ double range, a byte-order mark, bytes that are not UTF-8, nesting deeper than 6
 
 CO-SIGNATURES. This file checks the Ed25519 signature only. A record that carries an ML-DSA-87
 co-signature (a "cosignature" member beside the envelope) or announces one (signed metadata.cosign.status
-"signed") is said so on every verdict that passes on the Ed25519 path: "co-signature present, NOT checked by this
-tool (use verify_offline --require-pq)". The exit code is unchanged. A caller that checks the co-signature itself (verify_offline.py)
-passes --cosignature-checked-by-caller and the line is not printed: it would sit inside that caller's PASS, which did check it.
+"signed") is said so on every verdict that passes: "co-signature present, NOT checked by this
+tool (use verify_offline --require-pq)". Each one is then named on a line of its own beginning "  not checked: ":
+the one carried beside the record and the one the signed bytes announce (one line when both name one key id), with
+its key id and the signer and algorithm the key file given states for that key id; when the key file does not name
+the key id exactly once, or there is none, the line says the signer is unknown. A key id is printed escaped and only
+up to 128 characters. On the ML-DSA-87 path, where this file checks no signature at all, the same lines are printed
+for a record that has a co-signature. The exit code is unchanged. A caller that checks the co-signature itself (verify_offline.py)
+passes --cosignature-checked-by-caller and these lines are not printed: they would sit inside that caller's PASS, which did check it.
 
 THE CHECKS, in order (an accusation needs standing, so it waits until the key file names the key):
   1. the inputs: two readable JSON files, the envelope's four fields strings, an act hash given;
@@ -79,8 +86,9 @@ THE CHECKS, in order (an accusation needs standing, so it waits until the key fi
      effector allow's (receipt_type the act type, subject_type effector, signed
      metadata.record_kind requisition.lab.decision.v0);
   6. its signed metadata carries the four labels every lab record is signed with (profile lab, signer dev,
-     n6_profile not_followed, and hands: one of HANDS_VALUES, one-person (G-301) or
-     two-account, two-passkey (G-301); any other is lab_label_missing), or, for a record a lab KMS seat
+     n6_profile not_followed, and hands: one of HANDS_VALUES, one-person or two-account, two-passkey, or the
+     same two as records signed before 2026-11-19 spell them, HANDS_VALUES_EARLIER; any other is
+     lab_label_missing), or, for a record a lab KMS seat
      signed, the same four with signer kms. The stronger hands value must carry two distinct sanctioners
      and two distinct approval_records, and no record may carry hands_evidence (else lab_hands_unsupported);
      a record that passes with it is said to rest on those two signed members, NOT re-derived here and
@@ -103,26 +111,39 @@ THE CHECKS, in order (an accusation needs standing, so it waits until the key fi
      can check.
 
 A RECORD SIGNED BY A LAB KMS KEY is checked exactly as above on its path. A record that passes
-is still DEGRADED (lab) and exits 5: on the Ed25519 path with verdict_code lab_kms_key (the
+is still DEGRADED (lab): on the Ed25519 path it exits 5 with verdict_code lab_kms_key (the
 record's signed signer is kms; lab_dev_key is a signer-dev record's only;
 a CEASE exits 0 there, lab_recorded_no_authority, as for a dev key),
-on the ML-DSA-87 path with lab_signature_unchecked_mldsa87 as for any record there. The message says
+on the ML-DSA-87 path 7 with lab_signature_unchecked_mldsa87 as for any record there. The message says
 ONLY what this file can establish offline: the record was signed by a lab key the
 key file given pins as AWS KMS key <kms_key_arn> (signer kms), its signature checked against that
 pinned public key (on the ML-DSA-87 path: by mix requisition.lab.verify_mldsa87, not here); that
 the private key is held in AWS KMS and never exported is the key file's statement, not checked.
 
 EXIT CODES: 0 (on the Ed25519 path, a CEASE record that passed: RECORDED (no authority),
-lab_recorded_no_authority), 5 (a lab record that passed: lab_dev_key, lab_kms_key or
-lab_signature_unchecked_mldsa87; or a trust refusal: the verifier's; on either path lab_key_revoked,
+lab_recorded_no_authority), 5 (a lab record that passed with its Ed25519 signature checked: lab_dev_key or
+lab_kms_key; or a trust refusal: the verifier's; on either path lab_key_revoked,
 lab_key_status_not_active, lab_key_window_unreadable, lab_signed_instant_unreadable, lab_key_not_valid_at_signing
 (THE KEY RULE) or lab_signer_not_accepted (--accept-signer); lab_key_not_prime_order (the Ed25519 key material);
 lab_key_fingerprint_mismatch or lab_key_public_key_malformed (the ML-DSA-87 entry); or lab_verifier_unavailable),
 1 (a refusal of the record, or of an entry whose algorithm is absent or not known: every other lab_ code), 2 (usage),
-and whatever else the unchanged verifier answered, passed through (1, 2, 5 or 6). Every exit-0, exit-1 and exit-5
+7 (on the ML-DSA-87 path, a record whose bytes, binding and labels check out and whose signature this file did NOT
+check: lab_signature_unchecked_mldsa87; no flag changes it), and whatever else the unchanged verifier answered, passed
+through (1, 2, 5 or 6). Every exit-0, exit-1, exit-5 and exit-7
 answer of this file, and every exit-1 or exit-5 verdict of the verifier, ends with one line
 "verdict_code: <code>". Codes of this file are its own, each lab_-prefixed,
 sharing no spelling with the verifier's, a step-0 code or a DenialTaxonomy code.
+
+WHAT A PASS SAYS (bench/holytrinity-v2/verifier/VERDICTS.md, the section of that name). Every answer for a record
+that passed with its Ed25519 signature checked (lab_dev_key, lab_kms_key, lab_recorded_no_authority) carries, before
+its verdict_code line, one fixed sentence (PASS_LINE): a pass shows the bytes were signed under the key supplied, and
+it is not permission to act. A deadline the signed bytes carry is reported after it as what the record says, for a
+decision that allowed (the signed verdict is "allow") and for a statement (a statement record with no signed verdict, and exp), each in its
+own words, and for no other record; it is compared with nothing unless --at TIME is given (one instant,
+YYYY-MM-DDTHH:MM:SSZ; any other value is a usage error, exit 2), and then the line says whether the record's window
+was open at that instant. No exit depends on a time. On
+the ML-DSA-87 path this file checked no signature, so it prints UNCHECKED_LINE in the sentence's place, reports no
+deadline and compares no time.
 
 LOG CHECKPOINTS (bench/holytrinity-v2/verifier/CHECKPOINTS.md). The checkpoint flags are handed, as given, to
 verify_receipt.py on the Ed25519 path, which checks the record against a checkpoint of the evaluation environment's
@@ -147,6 +168,9 @@ import sys
 import tempfile
 
 EXIT_LAB, EXIT_REFUSED, EXIT_USAGE = 5, 1, 2
+# A record on the ML-DSA-87 path whose signature this file did not check: a status of its own, neither a pass's nor 0,
+# so that no caller branching on the status takes "not checked" for "checked" (default deny)
+EXIT_UNCHECKED = 7
 # A CEASE record that passed on the Ed25519 path: it authorises nothing, so there is no trust to
 # decline, and the answer is RECORDED (no authority) with exit 0
 EXIT_RECORDED = 0
@@ -159,7 +183,7 @@ ENVELOPE = ("signature", "key_id", "signed_payload", "receipt_hash")
 # The log checkpoint's flags, handed to verify_receipt.py as given (LOG CHECKPOINTS, above), and the line by which it
 # says every check held.
 CHECKPOINT_FLAGS = ("--checkpoint", "--inclusion-proof", "--witness-policy", "--held-size", "--held-root",
-                    "--consistency-proof", "--key-transition", "--held-state")
+                    "--consistency-proof", "--key-transition", "--held-state", "--held-to-transition-proof")
 CHECKPOINT_HELD = "log checkpoint: all checks held: inclusion, witness quorum, not older than the held size"
 
 # LabSigner's seat table (lib/autonomous_agency/authority/execute_api/lab_signer.ex, seats/0). A
@@ -175,7 +199,7 @@ LABELS = {
     "profile": "lab",
     "signer": "dev",
     "n6_profile": "not_followed",
-    "hands": "one-person (G-301)",
+    "hands": "one-person",
 }
 
 # Hands.values/0 (lib/autonomous_agency/authority/execute_api/hands.ex), the values the hands label is derived to: the
@@ -183,9 +207,21 @@ LABELS = {
 # rule); check_lab_record accepts either, refuses any other value by name, never upgrades one, and says what the stronger
 # one rests on.
 HANDS_VALUES = (
+    "one-person",
+    "two-account, two-passkey",
+)
+
+# Hands.earlier_values/0: the same two values as records signed before 2026-11-19 spell them (label version 1, which
+# ended in an internal issue id), in the same order. Those records are not signed again: a record carrying either
+# spelling of a value is accepted and judged alike. Nothing signs these any more.
+HANDS_VALUES_EARLIER = (
     "one-person (G-301)",
     "two-account, two-passkey (G-301)",
 )
+
+# every accepted spelling; and the spellings of the first value (a record whose evidence meets no stronger rule)
+HANDS_ACCEPTED = HANDS_VALUES + HANDS_VALUES_EARLIER
+HANDS_FIRST = (HANDS_VALUES[0], HANDS_VALUES_EARLIER[0])
 
 # LabKms.key_id_prefixes/0 (lib/autonomous_agency/authority/execute_api/lab_kms.ex), the lab KMS
 # keys' key id prefix by algorithm. A named second copy: lab_verify_pins_test.exs fails when the two
@@ -397,16 +433,160 @@ def ed25519_signature_canonical(signature: bytes) -> bool:
     return _decode_canonical_point(bytes(signature[:32])) is not None and int.from_bytes(signature[32:], "little") < _L
 
 
+# --- WHAT A PASS SAYS: one text in verify_receipt.py, bin/lab-verify, verify_offline.py and verify_chain.py ---
+# A pass is a statement about bytes and a key, and PASS_LINE says so after the verdict. A deadline the signed bytes
+# carry is reported as what the record says, never compared with a clock, for two kinds of record and no other. The
+# kind is read from the signed bytes (window_kind): a decision that allowed carries the verdict "allow" in its
+# metadata (WINDOW_DECISION: its deadline is exec_not_after, or not_after when that is absent, and its start is
+# decided_at); a statement is a record whose signed receipt_type is WINDOW_STATEMENT_TYPE and whose metadata carries
+# no verdict member and carries exp (WINDOW_STATEMENT: its deadline is exp, its start nbf). Every other record has no
+# window: a verdict that is not "allow" allowed nothing, a record of another kind that signs exp and no verdict is no
+# statement, and a record with no verdict and no exp is neither kind (a caller grant signs not_after, the day the
+# grant ends, which is no deadline for an execution). With an instant given (--at), that instant is compared with the signed values as text, which is
+# chronological order for the one accepted form: the window is open from its start (a record that signs none has
+# only its end compared) up to, and not at, its end. A member that is present and is not an instant of the accepted
+# form is said so and is never compared. No exit depends on any of it.
+PASS_LINE = (
+    "A pass shows these bytes were signed under the key you supplied. It is not permission to act. "
+    "Whether an action may run is decided by the issuing system when it runs."
+)
+# each kind: (the sentence its deadline is reported in, the members read as its end, the members read as its start)
+WINDOW_DECISION = ("This decision allowed execution until %s.", ("exec_not_after", "not_after"), ("decided_at",))
+WINDOW_STATEMENT = ("This statement was valid until %s.", ("exp",), ("nbf",))
+# the signed receipt_type of a statement record, the only kind whose exp is reported
+WINDOW_STATEMENT_TYPE = "requisition.lab.statement.v0"
+WINDOW_INSTANT_SHAPE = "dddd-dd-ddTdd:dd:ddZ"
+
+
+def window_instant(value):
+    """True for exactly YYYY-MM-DDTHH:MM:SSZ (ASCII digits) that is a real instant of the proleptic Gregorian
+    calendar: month 01 to 12, a day that month has in that year, hour 00 to 23, minute and second 00 to 59."""
+    if not (isinstance(value, str) and len(value) == 20
+            and all((c in "0123456789") if m == "d" else c == m for c, m in zip(value, WINDOW_INSTANT_SHAPE))):
+        return False
+    year, month, day = int(value[0:4]), int(value[5:7]), int(value[8:10])
+    if month < 1 or month > 12 or int(value[11:13]) > 23 or int(value[14:16]) > 59 or int(value[17:19]) > 59:
+        return False
+    leap = year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
+    return 1 <= day <= (31, 29 if leap else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)[month - 1]
+
+
+def window_kind(signed, metadata):
+    """WINDOW_DECISION, WINDOW_STATEMENT or None: the kind of record a deadline is reported for. A signed verdict
+    decides alone: a record that carries one is a decision, and it allowed only when the verdict is the text
+    "allow". A record that carries none is a statement when its signed receipt_type is WINDOW_STATEMENT_TYPE and it
+    carries exp, and is neither kind otherwise."""
+    if "verdict" in metadata:
+        return WINDOW_DECISION if metadata["verdict"] == "allow" else None
+    if signed.get("receipt_type") != WINDOW_STATEMENT_TYPE:
+        return None
+    return WINDOW_STATEMENT if "exp" in metadata else None
+
+
+def window_lines(signed, at=None):
+    """The lines about the record's window that follow PASS_LINE; `at` is None or an accepted instant."""
+    if not isinstance(signed, dict):
+        signed = {}
+    metadata = signed.get("metadata")
+    if not isinstance(metadata, dict):
+        metadata = {}
+    sentence, end_names, start_names = window_kind(signed, metadata) or (None, (), ())
+    end_name = next((name for name in end_names if name in metadata), None)
+    if end_name is None:
+        return [] if at is None else ["No time was compared: this record carries no execution window."]
+    end = metadata[end_name]
+    if not window_instant(end):
+        return [
+            "The signed %s is not a readable instant, so no deadline is reported." % end_name,
+            "No time was compared." if at is None
+            else "No time was compared: the signed %s is not a readable instant." % end_name,
+        ]
+    lines = [sentence % end]
+    if at is None:
+        return lines + ["No time was compared."]
+    start_name = next((name for name in start_names if name in metadata), None)
+    if start_name is None:
+        if at < end:
+            return lines + ["At %s the window was open (until %s; the record signs no start, so none was compared)." % (at, end)]
+        return lines + ["At %s the window was closed (it ended at %s)." % (at, end)]
+    start = metadata[start_name]
+    if not window_instant(start):
+        return lines + ["No time was compared: the signed %s is not a readable instant." % start_name]
+    if at < start:
+        return lines + ["At %s the window was closed (it opened at %s)." % (at, start)]
+    if at >= end:
+        return lines + ["At %s the window was closed (it ended at %s)." % (at, end)]
+    return lines + ["At %s the window was open (from %s, until %s)." % (at, start, end)]
+# --- end of WHAT A PASS SAYS ---
+
+# The ML-DSA-87 path's line in PASS_LINE's place: this file checked no signature there, so it cannot say the bytes were
+# signed under the key supplied. The two sentences that follow are PASS_LINE's own.
+UNCHECKED_LINE = (
+    "This tool did not check this record's signature, so this answer does not show the bytes were signed under the "
+    "key you supplied. It is not permission to act. Whether an action may run is decided by the issuing system when "
+    "it runs."
+)
+
+
+def pass_text(signed, at):
+    """PASS_LINE and the record's window lines, as the text a passing Ed25519 answer carries before its code."""
+    return "\n".join([PASS_LINE] + window_lines(signed, at))
+
+
 COSIGNATURE_NOTE = "co-signature present, NOT checked by this tool (use verify_offline --require-pq)"
+COSIGNATURE_TEXT_MAX = 128  # the longest key id, signer or algorithm printed about a co-signature; a longer one is counted or left out
 
 
-def cosignature_line(receipt, signed):
-    """The line a passing Ed25519 verdict carries when the record has, or announces, an ML-DSA-87 co-signature."""
+def cosignature_named(entries, key_id):
+    """A co-signature's key id, and the signer and algorithm the key file given states for it, as the end of a line.
+
+    The key id of a co-signature beside the record is outside the signed bytes, and the key file is the caller's:
+    nothing here is checked. It is printed escaped (%r) and only up to COSIGNATURE_TEXT_MAX characters.
+    """
+    if not isinstance(key_id, str) or key_id == "":
+        return "it names no key id, so its signer is unknown"
+    if len(key_id) > COSIGNATURE_TEXT_MAX:
+        return "its key id is %d characters long and is not printed, so its signer is unknown" % len(key_id)
+    named = [e for e in entries if isinstance(e, dict) and e.get("key_id") == key_id]
+    if len(named) != 1:
+        return "key_id %r, which the key file given names %d times, so its signer is unknown" % (key_id, len(named))
+
+    def stated(name):
+        value = named[0].get(name)
+        if isinstance(value, str) and len(value) <= COSIGNATURE_TEXT_MAX:
+            return "%s %r" % (name, value)
+        return "%s not stated as short text" % name
+
+    return "key_id %r, %s, %s (signer and algorithm as the key file given states them)" % (
+        key_id, stated("signer"), stated("algorithm"))
+
+
+def cosignature_line(receipt, signed, entries, covers="this verdict covers the Ed25519 signature only"):
+    """The lines a passing verdict carries when the record has, or announces, an ML-DSA-87 co-signature.
+
+    The first says one is present and was not checked here. Then each one is named on a line of its own: the one
+    carried beside the record (the envelope member cosignature) and the one the signed bytes announce (the signed
+    metadata's cosign member with status "signed"); one line when both name one key id.
+    """
     cosign = signed["metadata"].get("cosign")
     announced = isinstance(cosign, dict) and cosign.get("status") == "signed"
-    if receipt.get("cosignature") is not None or announced:
-        return COSIGNATURE_NOTE + ": this verdict covers the Ed25519 signature only\n"
-    return ""
+    carried = receipt.get("cosignature")
+    if carried is None and not announced:
+        return ""
+    carried_key = carried.get("key_id") if isinstance(carried, dict) else None
+    announced_key = cosign.get("key_id") if announced else None
+    lines = [COSIGNATURE_NOTE + ": " + covers]
+    if carried is not None and announced and isinstance(carried_key, str) and carried_key == announced_key:
+        lines.append("  not checked: the co-signature carried beside this record and announced by the signed bytes: "
+                     + cosignature_named(entries, carried_key))
+    else:
+        if carried is not None:
+            lines.append("  not checked: the co-signature carried beside this record: "
+                         + cosignature_named(entries, carried_key))
+        if announced:
+            lines.append("  not checked: the co-signature the signed bytes announce: "
+                         + cosignature_named(entries, announced_key))
+    return "\n".join(lines) + "\n"
 
 
 def verdict(code, message, stream, verdict_code):
@@ -441,7 +621,7 @@ def b64(value):
 
 
 def options(argv):
-    opts = {"cosignature-checked-by-caller": False, "checkpoint": []}
+    opts = {"cosignature-checked-by-caller": False, "checkpoint": [], "at": None}
     index = 0
     while index < len(argv):
         flag = argv[index]
@@ -469,6 +649,16 @@ def options(argv):
             if flag[2:] in opts:
                 usage("%s given twice" % flag)
             opts[flag[2:]] = argv[index + 1]
+            index += 2
+        elif flag == "--at":
+            # WHAT A PASS SAYS: the time is judged as an argument, before anything is read. It changes no verdict.
+            if index + 1 >= len(argv):
+                usage("%s requires a value" % flag)
+            if opts["at"] is not None:
+                usage("%s given twice" % flag)
+            if not window_instant(argv[index + 1]):
+                usage("--at takes one instant of the form YYYY-MM-DDTHH:MM:SSZ")
+            opts["at"] = argv[index + 1]
             index += 2
         else:
             usage("unknown argument %r" % flag)
@@ -663,12 +853,13 @@ def check_lab_record(payload, key_id, act_hash, entry):
     expected = dict(LABELS, signer=KMS_SIGNER) if kms else LABELS
     missing = sorted(
         name for name, value in expected.items()
-        if (metadata.get(name) not in HANDS_VALUES if name == "hands" else metadata.get(name) != value)
+        if (metadata.get(name) not in HANDS_ACCEPTED if name == "hands" else metadata.get(name) != value)
     )
     if missing:
         refuse(
             "the signed metadata lacks the lab label(s) %s (every lab record is signed with "
-            "profile lab, signer dev (or kms), n6_profile not_followed and hands, one of %s)."
+            "profile lab, signer dev (or kms), n6_profile not_followed and hands, one of %s; a record signed "
+            "before 2026-11-19 may carry the earlier spelling of either)."
             % (", ".join(missing), ", ".join(HANDS_VALUES)),
             verdict_code="lab_label_missing",
         )
@@ -751,14 +942,14 @@ def _distinct_strings(value, length):
 
 
 def check_hands(metadata):
-    """The signed hands value is one of HANDS_VALUES (checked with the labels). No record carries hands_evidence (a name
+    """The signed hands value is one of HANDS_ACCEPTED (checked with the labels). No record carries hands_evidence (a name
     the producer never signs). The stronger value must carry, by shape, the members it rests on: two distinct sanctioners
     and two distinct approval_records. This file cannot re-derive the value; it refuses a record whose signed members
     cannot even support it, and never upgrades one."""
     if "hands_evidence" in metadata:
         refuse("the record carries hands_evidence, a member no lab record signs.", verdict_code="lab_hands_unsupported")
     hands = metadata.get("hands")
-    if hands == HANDS_VALUES[0]:
+    if hands in HANDS_FIRST:
         return
     if not (_distinct_strings(metadata.get("sanctioners"), 2)
             and _distinct_strings(metadata.get("approval_records"), 2)):
@@ -768,19 +959,19 @@ def check_hands(metadata):
 
 
 def hands_line(signed):
-    """What the stronger signed hands value rests on, said on every path that exits 5 for a record that passed; it repeats
+    """What the stronger signed hands value rests on, said on every path that exits 5 or 7 for a record that passed; it repeats
     the signed value and never states a stronger one. A record signed with the first value gets no line (its answer is
     unchanged)."""
     metadata = signed["metadata"]
     hands = metadata.get("hands")
-    if hands == HANDS_VALUES[0]:
+    if hands in HANDS_FIRST:
         return ""
     return ("\nsigned hands: %s, resting on the signed sanctioners and approval_records %s; NOT re-derived here; it "
             "shows two accounts, NOT that two people held them" % (hands, ", ".join(metadata["approval_records"])))
 
 
 def signed_verdict(signed):
-    """The record's signed verdict, said on every path that exits 5 for a record that passed: the exit judges the record's integrity, never whether it allows."""
+    """The record's signed verdict, said on every path that exits 5 or 7 for a record that passed: the exit judges the record's integrity, never whether it allows."""
     verdict = signed["metadata"].get("verdict")
     if isinstance(verdict, str):
         line = "signed verdict: %s (the record's own; the exit code does not tell an allow from a deny)" % verdict
@@ -847,15 +1038,15 @@ def main(argv):
         checkpoint = checkpoint_lines(out, opts["checkpoint"])
         signed = check_lab_record(payload, key_id, opts["act-hash"], entry)
         kms = signed["metadata"].get("signer") == KMS_SIGNER
-        cosig = ("" if opts["cosignature-checked-by-caller"] else cosignature_line(receipt, signed)) + checkpoint
+        cosig = ("" if opts["cosignature-checked-by-caller"] else cosignature_line(receipt, signed, entries)) + checkpoint
         if signed["metadata"].get("verdict") == "recorded_no_authority":
             print(
                 "the unchanged verify_receipt.py: exit 0 (the Ed25519 signature and the receipt hash "
                 "check out under key_id %r in the key file given).\n"
                 "the lab checks: kind, labels, key id and the display digest bound.\n%s\n"
                 "RECORDED (no authority): a record-only act (a CEASE), signed by %s; it "
-                "authorises nothing.\n\nverdict_code: lab_recorded_no_authority"
-                % (key_id, cosig, kms_degraded(signed) if kms else "the lab's dev key")
+                "authorises nothing.\n\n%s\n\nverdict_code: lab_recorded_no_authority"
+                % (key_id, cosig, kms_degraded(signed) if kms else "the lab's dev key", pass_text(signed, opts["at"]))
             )
             sys.exit(EXIT_RECORDED)
         head = (
@@ -863,10 +1054,11 @@ def main(argv):
             "check out under key_id %r in the key file given).\n"
             "the lab checks: kind, labels, key id and act hash bound.\n%s\n%s\n" % (key_id, signed_verdict(signed), cosig)
         )
+        said = "\n\n" + pass_text(signed, opts["at"])
         if kms:
-            print(head + kms_degraded(signed) + "\n\nverdict_code: lab_kms_key")
+            print(head + kms_degraded(signed) + said + "\n\nverdict_code: lab_kms_key")
         else:
-            print(head + DEGRADED_ED25519 + "\n\nverdict_code: lab_dev_key")
+            print(head + DEGRADED_ED25519 + said + "\n\nverdict_code: lab_dev_key")
         sys.exit(EXIT_LAB)
 
     check_mldsa87_entry(entry, key_id, signature)
@@ -877,6 +1069,14 @@ def main(argv):
             "run for it: its log checkpoint is not checked by this file.",
             verdict_code="lab_checkpoint_unchecked_mldsa87",
         )
+    not_compared = (
+        "" if opts["at"] is None else "\nNo time was compared: this tool did not check this record's signature."
+    )
+    cosig = (
+        ""
+        if opts["cosignature-checked-by-caller"]
+        else cosignature_line(receipt, signed, entries, "this tool checked no signature of this record")
+    )
     kms_note = (
         "\n" + kms_degraded(signed, " by mix requisition.lab.verify_mldsa87 (not by this verifier)")
         if signed["metadata"].get("signer") == KMS_SIGNER
@@ -884,11 +1084,11 @@ def main(argv):
     )
     print(
         "the record's bytes, binding and labels check out under key_id %r: receipt hash, kind, "
-        "labels, key id and act hash.\n%s\nits signature is checked by: mix requisition.lab.verify_mldsa87 "
-        "ENVELOPE --keys LAB-KEYS.json\n\n%s\n\nverdict_code: lab_signature_unchecked_mldsa87"
-        % (key_id, signed_verdict(signed), DEGRADED_MLDSA87 + kms_note)
+        "labels, key id and act hash.\n%s\n%sits signature is checked by: mix requisition.lab.verify_mldsa87 "
+        "ENVELOPE --keys LAB-KEYS.json\n\n%s\n\n%s\n\nverdict_code: lab_signature_unchecked_mldsa87"
+        % (key_id, signed_verdict(signed), cosig, DEGRADED_MLDSA87 + kms_note, UNCHECKED_LINE + not_compared)
     )
-    sys.exit(EXIT_LAB)
+    sys.exit(EXIT_UNCHECKED)
 
 
 if __name__ == "__main__":

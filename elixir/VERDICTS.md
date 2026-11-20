@@ -56,6 +56,7 @@ name a situation; it can never name an invocation. Adding a token is deliberatel
 | `empty-entries` | `--registry corpus/registry-empty-entries.json` | — |
 | `none` | the flag is omitted entirely | the flag is omitted entirely |
 | `dangling` | — | `--receipt` supplied with no value after it |
+| `unknown-argument` | — | `--receipt corpus/verified.json`, and after the registry one argument the verifier does not take, `--no-such-flag` |
 
 Paths are relative to `verifier/`, which is where both verifiers are run from.
 
@@ -132,6 +133,7 @@ Paths are relative to `verifier/`, which is where both verifiers are run from.
 | V-COMPROMISED | `corpus/compromised-key.json` | `corpus` | `6` | key compromised | signature valid and in window, under a key the registry marks compromised |
 | V-NO-RECEIPT | `none` | `corpus` | `2` | usage error | no `--receipt`; says nothing about any receipt |
 | V-ARGV-ODD | `dangling` | `corpus` | `2` | usage error | `--receipt` with no value; a malformed invocation must not be read as a verdict |
+| V-ARGV-UNKNOWN | `unknown-argument` | `corpus` | `2` | usage error | the receipt and registry of V-VERIFIED, and one argument the verifier does not take; an argument skipped in silence could be a comparison the caller asked for, so nothing is judged |
 
 ## The order the checks run in, because two conditions can both be true
 
@@ -508,3 +510,138 @@ refuses to sign bytes this rule does not read (a record nested beyond 64, or hol
 more than 1024 characters), so a chain receipt appended since this change is one that it, and
 either verifier, reads. That sentence is about the append of a chain receipt and no other signing
 path of the issuing system.
+
+## What a pass says (added 2026-11-19)
+
+Exit `0` says that the signed bytes verify under the registry entry the receipt names. It does not say that
+anything may be done. Both verifiers print this sentence on every exit `0`, on a line of its own after the verdict,
+and print it on no other exit:
+
+> A pass shows these bytes were signed under the key you supplied. It is not permission to act. Whether an action may run is decided by the issuing system when it runs.
+
+**A deadline is reported as what the record says, for two kinds of record and no other.** The kind is read from
+the signed bytes: the members of their object `metadata`, and for a statement their `receipt_type`:
+
+- **a decision that allowed**: `metadata` carries a `verdict`, and it is the text `allow`. Its deadline is
+  `exec_not_after`, or `not_after` when `exec_not_after` is absent. Its window starts at `decided_at`;
+- **a statement**: the signed `receipt_type` is `requisition.lab.statement.v0`, and `metadata` carries no
+  `verdict` member, and carries `exp`. Its deadline is `exp`. Its window starts at `nbf`.
+
+A member whose value is `null` is present. Every other record has no window, and nothing is looked for. A decision
+whose `verdict` is not the text `allow` allowed nothing. A record that carries neither a `verdict` nor `exp` is
+neither kind: a caller grant signs `not_after`, the day the grant ends, and no `verdict`, and it is not reported as
+a decision. A record of another kind that signs `exp` and no `verdict` is no statement. A member of the other kind is not read: an `exp` in a decision, or an `exec_not_after` in a statement,
+reports nothing. After the sentence the verifier then prints:
+
+- for a record with no window, no line;
+- when the deadline is an instant (this document's one accepted form, `YYYY-MM-DDTHH:MM:SSZ`, a real calendar
+  instant), `This decision allowed execution until <the value as signed>.` for a decision, and
+  `This statement was valid until <the value as signed>.` for a statement;
+- for any other value, `The signed <member> is not a readable instant, so no deadline is reported.`;
+
+and, for a record with such a member, `No time was compared.`: the verifier read no clock.
+
+**`--at TIME`** gives one instant in the same form. Any other value is a usage error (exit `2`), judged before
+anything is read. The last line then says whether the record's window was open at that instant. The window starts
+at the signed `decided_at` of a decision, or at the signed `nbf` of a statement, and ends at the deadline. It is
+open from its start up to, and not at, its end. The instants are compared as text, which is chronological order for
+the accepted form; nothing is converted. The start is compared first. A record that signs no start has only its end
+compared, and the line says so. A start or an end that is present and is not an instant is never compared, and the
+line names it. A record with no window answers `No time was compared: this record carries no execution window.`
+
+**The exit never depends on a time.** Every row below exits `0`, whether its window was open, closed or not
+compared: an expired decision is still a valid record. The same record given twice gets the same answer twice
+(a test runs it twice through each verifier, without the flags of the evaluation environment's log checkpoint
+check): protection against replay is not the verifier's.
+
+Each row is a record whose signed `metadata` carries, among `verdict`, `exec_not_after`, `exp`, `not_after`, `nbf`
+and `decided_at`, exactly the members shown. `kind` names the record the test builds and signs: a decision, a
+statement, a cease (a record-only act), or a grant (a record shaped as a caller grant, which signs no verdict).
+Every row exits `0` in both verifiers and ends with the sentence above and then the lines shown. The test builds
+these records with a key made for the run; they are not corpus files.
+
+| row | kind | signed metadata | time given | the lines after the fixed sentence |
+|---|---|---|---|---|
+| `allow_no_time` | decision | `{"verdict":"allow","decided_at":"2026-11-13T15:56:48Z","exec_not_after":"2026-11-13T15:57:48Z","not_after":"2026-11-13T15:58:48Z"}` | none | This decision allowed execution until 2026-11-13T15:57:48Z.<br>No time was compared. |
+| `allow_before_start` | decision | `{"verdict":"allow","decided_at":"2026-11-13T15:56:48Z","exec_not_after":"2026-11-13T15:57:48Z","not_after":"2026-11-13T15:58:48Z"}` | `2026-11-13T15:56:47Z` | This decision allowed execution until 2026-11-13T15:57:48Z.<br>At 2026-11-13T15:56:47Z the window was closed (it opened at 2026-11-13T15:56:48Z). |
+| `allow_at_start` | decision | `{"verdict":"allow","decided_at":"2026-11-13T15:56:48Z","exec_not_after":"2026-11-13T15:57:48Z","not_after":"2026-11-13T15:58:48Z"}` | `2026-11-13T15:56:48Z` | This decision allowed execution until 2026-11-13T15:57:48Z.<br>At 2026-11-13T15:56:48Z the window was open (from 2026-11-13T15:56:48Z, until 2026-11-13T15:57:48Z). |
+| `allow_last_second` | decision | `{"verdict":"allow","decided_at":"2026-11-13T15:56:48Z","exec_not_after":"2026-11-13T15:57:48Z","not_after":"2026-11-13T15:58:48Z"}` | `2026-11-13T15:57:47Z` | This decision allowed execution until 2026-11-13T15:57:48Z.<br>At 2026-11-13T15:57:47Z the window was open (from 2026-11-13T15:56:48Z, until 2026-11-13T15:57:48Z). |
+| `allow_at_end` | decision | `{"verdict":"allow","decided_at":"2026-11-13T15:56:48Z","exec_not_after":"2026-11-13T15:57:48Z","not_after":"2026-11-13T15:58:48Z"}` | `2026-11-13T15:57:48Z` | This decision allowed execution until 2026-11-13T15:57:48Z.<br>At 2026-11-13T15:57:48Z the window was closed (it ended at 2026-11-13T15:57:48Z). |
+| `allow_after_end` | decision | `{"verdict":"allow","decided_at":"2026-11-13T15:56:48Z","exec_not_after":"2026-11-13T15:57:48Z","not_after":"2026-11-13T15:58:48Z"}` | `2027-01-01T00:00:00Z` | This decision allowed execution until 2026-11-13T15:57:48Z.<br>At 2027-01-01T00:00:00Z the window was closed (it ended at 2026-11-13T15:57:48Z). |
+| `statement_no_time` | statement | `{"nbf":"2026-11-13T15:56:38Z","exp":"2026-11-13T16:01:38Z"}` | none | This statement was valid until 2026-11-13T16:01:38Z.<br>No time was compared. |
+| `statement_open` | statement | `{"nbf":"2026-11-13T15:56:38Z","exp":"2026-11-13T16:01:38Z"}` | `2026-11-13T15:56:48Z` | This statement was valid until 2026-11-13T16:01:38Z.<br>At 2026-11-13T15:56:48Z the window was open (from 2026-11-13T15:56:38Z, until 2026-11-13T16:01:38Z). |
+| `statement_before_nbf` | statement | `{"nbf":"2026-11-13T15:56:38Z","exp":"2026-11-13T16:01:38Z"}` | `2026-11-13T15:56:37Z` | This statement was valid until 2026-11-13T16:01:38Z.<br>At 2026-11-13T15:56:37Z the window was closed (it opened at 2026-11-13T15:56:38Z). |
+| `statement_at_exp` | statement | `{"nbf":"2026-11-13T15:56:38Z","exp":"2026-11-13T16:01:38Z"}` | `2026-11-13T16:01:38Z` | This statement was valid until 2026-11-13T16:01:38Z.<br>At 2026-11-13T16:01:38Z the window was closed (it ended at 2026-11-13T16:01:38Z). |
+| `statement_no_nbf_open` | statement | `{"exp":"2026-11-13T16:01:38Z"}` | `2026-11-13T15:56:48Z` | This statement was valid until 2026-11-13T16:01:38Z.<br>At 2026-11-13T15:56:48Z the window was open (until 2026-11-13T16:01:38Z; the record signs no start, so none was compared). |
+| `statement_decision_members_not_read` | statement | `{"nbf":"2026-11-13T15:56:38Z","exp":"2026-11-13T16:01:38Z","decided_at":"2026-11-13T15:56:58Z","exec_not_after":"2026-11-13T15:57:48Z","not_after":"2026-11-13T15:58:48Z"}` | `2026-11-13T15:56:48Z` | This statement was valid until 2026-11-13T16:01:38Z.<br>At 2026-11-13T15:56:48Z the window was open (from 2026-11-13T15:56:38Z, until 2026-11-13T16:01:38Z). |
+| `deny_no_time` | decision | `{"verdict":"deny","decided_at":"2026-11-13T15:56:48Z","not_after":"2026-11-13T15:58:48Z"}` | none | none |
+| `deny_at` | decision | `{"verdict":"deny","decided_at":"2026-11-13T15:56:48Z","not_after":"2026-11-13T15:58:48Z"}` | `2026-11-13T15:56:48Z` | No time was compared: this record carries no execution window. |
+| `cease_no_time` | cease | `{"verdict":"recorded_no_authority","decided_at":"2026-11-13T15:56:48Z","not_after":"2026-11-13T15:58:48Z"}` | none | none |
+| `cease_at` | cease | `{"verdict":"recorded_no_authority","decided_at":"2026-11-13T15:56:48Z","not_after":"2026-11-13T15:58:48Z"}` | `2026-11-13T15:56:48Z` | No time was compared: this record carries no execution window. |
+| `grant_no_time` | grant | `{"not_after":"2027-11-13T00:00:00Z"}` | none | none |
+| `grant_at` | grant | `{"not_after":"2027-11-13T00:00:00Z"}` | `2026-12-01T00:00:00Z` | No time was compared: this record carries no execution window. |
+| `no_verdict_exec_not_after` | grant | `{"decided_at":"2026-11-13T15:56:48Z","exec_not_after":"2026-11-13T15:57:48Z"}` | none | none |
+| `no_verdict_exec_not_after_at` | grant | `{"decided_at":"2026-11-13T15:56:48Z","exec_not_after":"2026-11-13T15:57:48Z"}` | `2026-11-13T15:56:48Z` | No time was compared: this record carries no execution window. |
+| `other_kind_with_exp` | grant | `{"nbf":"2026-11-13T15:56:38Z","exp":"2026-11-13T16:01:38Z"}` | none | none |
+| `other_kind_with_exp_at` | grant | `{"nbf":"2026-11-13T15:56:38Z","exp":"2026-11-13T16:01:38Z"}` | `2026-11-13T15:56:48Z` | No time was compared: this record carries no execution window. |
+| `verdict_null_with_exp` | statement | `{"verdict":null,"nbf":"2026-11-13T15:56:38Z","exp":"2026-11-13T16:01:38Z"}` | none | none |
+| `verdict_deny_with_exp` | decision | `{"verdict":"deny","nbf":"2026-11-13T15:56:38Z","exp":"2026-11-13T16:01:38Z"}` | `2026-11-13T15:56:48Z` | No time was compared: this record carries no execution window. |
+| `no_members_no_time` | statement | `{}` | none | none |
+| `no_members_at` | statement | `{}` | `2026-11-13T15:56:48Z` | No time was compared: this record carries no execution window. |
+| `verdict_not_text` | decision | `{"verdict":["allow"],"exec_not_after":"2026-11-13T15:57:48Z"}` | none | none |
+| `end_only_open` | decision | `{"verdict":"allow","exec_not_after":"2026-11-13T15:57:48Z"}` | `2026-11-13T15:56:48Z` | This decision allowed execution until 2026-11-13T15:57:48Z.<br>At 2026-11-13T15:56:48Z the window was open (until 2026-11-13T15:57:48Z; the record signs no start, so none was compared). |
+| `end_only_closed` | decision | `{"verdict":"allow","exec_not_after":"2026-11-13T15:57:48Z"}` | `2026-11-13T15:57:48Z` | This decision allowed execution until 2026-11-13T15:57:48Z.<br>At 2026-11-13T15:57:48Z the window was closed (it ended at 2026-11-13T15:57:48Z). |
+| `order_exec_not_after_first` | decision | `{"verdict":"allow","decided_at":"2026-11-13T15:56:48Z","exec_not_after":"2026-11-13T15:57:48Z","exp":"2026-11-13T16:01:38Z","not_after":"2026-11-13T15:58:48Z"}` | none | This decision allowed execution until 2026-11-13T15:57:48Z.<br>No time was compared. |
+| `decision_exp_not_read` | decision | `{"verdict":"allow","decided_at":"2026-11-13T15:56:48Z","exp":"2026-11-13T16:01:38Z","not_after":"2026-11-13T15:58:48Z"}` | none | This decision allowed execution until 2026-11-13T15:58:48Z.<br>No time was compared. |
+| `order_not_after_last` | decision | `{"verdict":"allow","decided_at":"2026-11-13T15:56:48Z","not_after":"2026-11-13T15:58:48Z"}` | `2026-11-13T15:58:48Z` | This decision allowed execution until 2026-11-13T15:58:48Z.<br>At 2026-11-13T15:58:48Z the window was closed (it ended at 2026-11-13T15:58:48Z). |
+| `decision_nbf_not_read` | decision | `{"verdict":"allow","nbf":"2026-11-13T15:56:38Z","decided_at":"2026-11-13T15:56:48Z","exec_not_after":"2026-11-13T15:57:48Z"}` | `2026-11-13T15:56:40Z` | This decision allowed execution until 2026-11-13T15:57:48Z.<br>At 2026-11-13T15:56:40Z the window was closed (it opened at 2026-11-13T15:56:48Z). |
+| `decision_exp_alone` | decision | `{"verdict":"allow","decided_at":"2026-11-13T15:56:48Z","exp":"2026-11-13T16:01:38Z"}` | none | none |
+| `decision_exp_alone_at` | decision | `{"verdict":"allow","decided_at":"2026-11-13T15:56:48Z","exp":"2026-11-13T16:01:38Z"}` | `2026-11-13T15:56:48Z` | No time was compared: this record carries no execution window. |
+| `end_not_a_day` | decision | `{"verdict":"allow","decided_at":"2026-11-13T15:56:48Z","exec_not_after":"2026-02-30T00:00:00Z"}` | none | The signed exec_not_after is not a readable instant, so no deadline is reported.<br>No time was compared. |
+| `end_not_a_day_at` | decision | `{"verdict":"allow","decided_at":"2026-11-13T15:56:48Z","exec_not_after":"2026-02-30T00:00:00Z"}` | `2026-11-13T15:56:48Z` | The signed exec_not_after is not a readable instant, so no deadline is reported.<br>No time was compared: the signed exec_not_after is not a readable instant. |
+| `at_leap_day` | decision | `{"verdict":"allow","decided_at":"2024-02-28T23:59:59Z","exec_not_after":"2024-03-01T00:00:00Z"}` | `2024-02-29T00:00:00Z` | This decision allowed execution until 2024-03-01T00:00:00Z.<br>At 2024-02-29T00:00:00Z the window was open (from 2024-02-28T23:59:59Z, until 2024-03-01T00:00:00Z). |
+| `at_leap_day_last_second` | decision | `{"verdict":"allow","decided_at":"2024-02-28T23:59:59Z","exec_not_after":"2024-03-01T00:00:00Z"}` | `2024-02-29T23:59:59Z` | This decision allowed execution until 2024-03-01T00:00:00Z.<br>At 2024-02-29T23:59:59Z the window was open (from 2024-02-28T23:59:59Z, until 2024-03-01T00:00:00Z). |
+| `at_leap_day_2000` | decision | `{"verdict":"allow","decided_at":"2000-02-28T23:59:59Z","exec_not_after":"2000-03-01T00:00:00Z"}` | `2000-02-29T12:00:00Z` | This decision allowed execution until 2000-03-01T00:00:00Z.<br>At 2000-02-29T12:00:00Z the window was open (from 2000-02-28T23:59:59Z, until 2000-03-01T00:00:00Z). |
+| `at_month_last_second` | decision | `{"verdict":"allow","decided_at":"2026-04-30T00:00:00Z","exec_not_after":"2026-05-01T00:00:00Z"}` | `2026-04-30T23:59:59Z` | This decision allowed execution until 2026-05-01T00:00:00Z.<br>At 2026-04-30T23:59:59Z the window was open (from 2026-04-30T00:00:00Z, until 2026-05-01T00:00:00Z). |
+| `at_year_last_second` | decision | `{"verdict":"allow","decided_at":"2026-12-31T00:00:00Z","exec_not_after":"2027-01-01T00:00:00Z"}` | `2026-12-31T23:59:59Z` | This decision allowed execution until 2027-01-01T00:00:00Z.<br>At 2026-12-31T23:59:59Z the window was open (from 2026-12-31T00:00:00Z, until 2027-01-01T00:00:00Z). |
+| `at_year_first_second` | decision | `{"verdict":"allow","decided_at":"2026-12-31T00:00:00Z","exec_not_after":"2027-01-01T00:00:00Z"}` | `2027-01-01T00:00:00Z` | This decision allowed execution until 2027-01-01T00:00:00Z.<br>At 2027-01-01T00:00:00Z the window was closed (it ended at 2027-01-01T00:00:00Z). |
+| `end_last_day_january` | decision | `{"verdict":"allow","exec_not_after":"2026-01-31T23:59:59Z"}` | none | This decision allowed execution until 2026-01-31T23:59:59Z.<br>No time was compared. |
+| `end_last_day_march` | decision | `{"verdict":"allow","exec_not_after":"2026-03-31T23:59:59Z"}` | none | This decision allowed execution until 2026-03-31T23:59:59Z.<br>No time was compared. |
+| `end_last_day_april` | decision | `{"verdict":"allow","exec_not_after":"2026-04-30T23:59:59Z"}` | none | This decision allowed execution until 2026-04-30T23:59:59Z.<br>No time was compared. |
+| `end_last_day_may` | decision | `{"verdict":"allow","exec_not_after":"2026-05-31T23:59:59Z"}` | none | This decision allowed execution until 2026-05-31T23:59:59Z.<br>No time was compared. |
+| `end_last_day_june` | decision | `{"verdict":"allow","exec_not_after":"2026-06-30T23:59:59Z"}` | none | This decision allowed execution until 2026-06-30T23:59:59Z.<br>No time was compared. |
+| `end_last_day_july` | decision | `{"verdict":"allow","exec_not_after":"2026-07-31T23:59:59Z"}` | none | This decision allowed execution until 2026-07-31T23:59:59Z.<br>No time was compared. |
+| `end_last_day_august` | decision | `{"verdict":"allow","exec_not_after":"2026-08-31T23:59:59Z"}` | none | This decision allowed execution until 2026-08-31T23:59:59Z.<br>No time was compared. |
+| `end_last_day_september` | decision | `{"verdict":"allow","exec_not_after":"2026-09-30T23:59:59Z"}` | none | This decision allowed execution until 2026-09-30T23:59:59Z.<br>No time was compared. |
+| `end_last_day_october` | decision | `{"verdict":"allow","exec_not_after":"2026-10-31T23:59:59Z"}` | none | This decision allowed execution until 2026-10-31T23:59:59Z.<br>No time was compared. |
+| `end_last_day_november` | decision | `{"verdict":"allow","exec_not_after":"2026-11-30T23:59:59Z"}` | none | This decision allowed execution until 2026-11-30T23:59:59Z.<br>No time was compared. |
+| `end_last_day_december` | decision | `{"verdict":"allow","exec_not_after":"2026-12-31T23:59:59Z"}` | none | This decision allowed execution until 2026-12-31T23:59:59Z.<br>No time was compared. |
+| `end_28_february` | decision | `{"verdict":"allow","exec_not_after":"2026-02-28T23:59:59Z"}` | none | This decision allowed execution until 2026-02-28T23:59:59Z.<br>No time was compared. |
+| `end_leap_day` | decision | `{"verdict":"allow","exec_not_after":"2024-02-29T23:59:59Z"}` | none | This decision allowed execution until 2024-02-29T23:59:59Z.<br>No time was compared. |
+| `end_leap_day_2000` | decision | `{"verdict":"allow","exec_not_after":"2000-02-29T00:00:00Z"}` | none | This decision allowed execution until 2000-02-29T00:00:00Z.<br>No time was compared. |
+| `end_29_february_2026` | decision | `{"verdict":"allow","exec_not_after":"2026-02-29T00:00:00Z"}` | none | The signed exec_not_after is not a readable instant, so no deadline is reported.<br>No time was compared. |
+| `end_29_february_2100` | decision | `{"verdict":"allow","exec_not_after":"2100-02-29T00:00:00Z"}` | none | The signed exec_not_after is not a readable instant, so no deadline is reported.<br>No time was compared. |
+| `end_31_april` | decision | `{"verdict":"allow","exec_not_after":"2026-04-31T00:00:00Z"}` | none | The signed exec_not_after is not a readable instant, so no deadline is reported.<br>No time was compared. |
+| `end_31_june` | decision | `{"verdict":"allow","exec_not_after":"2026-06-31T00:00:00Z"}` | none | The signed exec_not_after is not a readable instant, so no deadline is reported.<br>No time was compared. |
+| `end_31_september` | decision | `{"verdict":"allow","exec_not_after":"2026-09-31T00:00:00Z"}` | none | The signed exec_not_after is not a readable instant, so no deadline is reported.<br>No time was compared. |
+| `end_31_november` | decision | `{"verdict":"allow","exec_not_after":"2026-11-31T00:00:00Z"}` | none | The signed exec_not_after is not a readable instant, so no deadline is reported.<br>No time was compared. |
+| `end_minute_60` | decision | `{"verdict":"allow","exec_not_after":"2026-11-13T15:60:00Z"}` | none | The signed exec_not_after is not a readable instant, so no deadline is reported.<br>No time was compared. |
+| `end_day_00` | decision | `{"verdict":"allow","exec_not_after":"2026-11-00T00:00:00Z"}` | none | The signed exec_not_after is not a readable instant, so no deadline is reported.<br>No time was compared. |
+| `end_month_00` | decision | `{"verdict":"allow","exec_not_after":"2026-00-13T00:00:00Z"}` | none | The signed exec_not_after is not a readable instant, so no deadline is reported.<br>No time was compared. |
+| `end_month_13` | decision | `{"verdict":"allow","exec_not_after":"2026-13-01T00:00:00Z"}` | none | The signed exec_not_after is not a readable instant, so no deadline is reported.<br>No time was compared. |
+| `end_null_is_present` | decision | `{"verdict":"allow","exec_not_after":null,"not_after":"2026-11-13T15:58:48Z"}` | none | The signed exec_not_after is not a readable instant, so no deadline is reported.<br>No time was compared. |
+| `end_a_number` | decision | `{"verdict":"allow","exec_not_after":1794585468}` | none | The signed exec_not_after is not a readable instant, so no deadline is reported.<br>No time was compared. |
+| `end_with_offset` | decision | `{"verdict":"allow","exec_not_after":"2026-11-13T15:57:48+00:00"}` | none | The signed exec_not_after is not a readable instant, so no deadline is reported.<br>No time was compared. |
+| `end_with_fraction` | decision | `{"verdict":"allow","exec_not_after":"2026-11-13T15:57:48.000Z"}` | none | The signed exec_not_after is not a readable instant, so no deadline is reported.<br>No time was compared. |
+| `start_unreadable_no_time` | decision | `{"verdict":"allow","decided_at":"2026-11-13 15:56:48","exec_not_after":"2026-11-13T15:57:48Z"}` | none | This decision allowed execution until 2026-11-13T15:57:48Z.<br>No time was compared. |
+| `start_unreadable_at` | decision | `{"verdict":"allow","decided_at":"2026-11-13 15:56:48","exec_not_after":"2026-11-13T15:57:48Z"}` | `2026-11-13T15:56:48Z` | This decision allowed execution until 2026-11-13T15:57:48Z.<br>No time was compared: the signed decided_at is not a readable instant. |
+| `start_after_end_between` | decision | `{"verdict":"allow","decided_at":"2026-11-13T15:57:48Z","exec_not_after":"2026-11-13T15:56:48Z"}` | `2026-11-13T15:57:00Z` | This decision allowed execution until 2026-11-13T15:56:48Z.<br>At 2026-11-13T15:57:00Z the window was closed (it opened at 2026-11-13T15:57:48Z). |
+| `start_after_end_later` | decision | `{"verdict":"allow","decided_at":"2026-11-13T15:57:48Z","exec_not_after":"2026-11-13T15:56:48Z"}` | `2026-11-13T15:58:48Z` | This decision allowed execution until 2026-11-13T15:56:48Z.<br>At 2026-11-13T15:58:48Z the window was closed (it ended at 2026-11-13T15:56:48Z). |
+
+Each of these values given as the time exits `2`, in both verifiers: "", "2026-11-13T15:57:48+00:00", "2026-11-13T15:57:48.000Z", "2026-11-13t15:57:48z", "2026-11-13 15:57:48Z", "2026-02-30T00:00:00Z", "2026-11-13T24:00:00Z", "2026-11-13T15:57:60Z", "1794585468", "2026-11-13T15:57:48Z\n", " 2026-11-13T15:57:48Z", "now", "2026-02-29T00:00:00Z", "2100-02-29T00:00:00Z", "2026-04-31T00:00:00Z", "2026-06-31T00:00:00Z", "2026-09-31T00:00:00Z", "2026-11-31T00:00:00Z", "2026-01-32T00:00:00Z", "2026-11-13T15:60:00Z", "2026-11-00T00:00:00Z", "2026-00-13T00:00:00Z", "2026-13-01T00:00:00Z". So does `--at` with no value after it.
+
+**An argument the verifier does not take is a usage error (exit `2`), never skipped.** A verifier that skipped
+`--att 2026-11-13T15:57:00Z` would print a pass and compare nothing, where the caller asked for a comparison. Each
+of these, added to an invocation that passes without it, exits `2` in both verifiers, and nothing is judged:
+`--att 2026-11-13T15:57:00Z`, `--AT 2026-11-13T15:57:00Z`, `--time 2026-11-13T15:57:00Z`, `-at 2026-11-13T15:57:00Z`, `2026-11-13T15:57:00Z`, `--at 2026-11-13T15:57:00Z --verbose`. The message names the argument's position and does not echo it. Verifiers before this change skipped such an
+argument.

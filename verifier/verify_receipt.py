@@ -3,10 +3,10 @@
 # Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 """verify_receipt.py — check a Trinity authority receipt's Ed25519 signature.
 
-    python3 verify_receipt.py --receipt RECEIPT.json --registry REGISTRY.json
+    python3 verify_receipt.py --receipt RECEIPT.json --registry REGISTRY.json [--at TIME]
         [--checkpoint NOTE --inclusion-proof PROOF.json --witness-policy POLICY
          [--held-size N --held-root ROOT | --held-state FILE [--write-held-state]]
-         [--consistency-proof PROOF.json] [--key-transition RECORD.json]]
+         [--consistency-proof PROOF.json] [--key-transition RECORD.json [--held-to-transition-proof PROOF.json]]]
 
 Python standard library only. No pip installs, no network. Tested with Python 3.11 and 3.12.
 
@@ -62,6 +62,15 @@ the evaluation environment's transparency log: its inclusion under a checkpoint 
 and cosigned by the witnesses the relying party's policy names, and that the checkpoint is not older
 than the tree the relying party holds. CHECKPOINTS.md, beside this file, states the checks, the
 inputs, every refusal and what is not checked; the code is the section of that name below.
+
+WHAT A PASS SAYS. Every exit 0 prints, after its verdict, one fixed sentence (PASS_LINE): a pass shows
+the bytes were signed under the key supplied, and it is not permission to act. A deadline the signed
+bytes carry is reported after it as what the record says, for a decision that allowed (the signed
+verdict is "allow") and for a statement (a statement record with no signed verdict, and exp), each in its own words, and for no
+other record; it is compared with nothing unless --at TIME is given (one instant, YYYY-MM-DDTHH:MM:SSZ;
+any other value is a usage error, exit 2), and then the line says whether the record's window was open
+at that instant. No exit depends on a time: an expired decision is still a valid record. VERDICTS.md
+("What a pass says") states the rule and its rows; the code is the section of that name below.
 
 NO INPUT ENDS IN A STACK TRACE. A runtime that dies on an uncaught exception exits 1, which
 VERDICTS.md reserves for "the receipt is bad", and writes no code line. So every named member of the
@@ -251,7 +260,7 @@ def ed25519_verify(signature, message, public_key):
 # so only a receipt whose signature verified reaches them.
 STATUSES = ("example", "active", "retired", "compromised")
 ENVELOPE = ("signature", "key_id", "signed_payload", "receipt_hash")
-IGNORED = ("public_key", "_note")
+IGNORED = ("public_key",)
 TS = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\Z")
 
 
@@ -262,7 +271,8 @@ def member(obj, name):
     value and meets the same typed refusal an absent value meets. (The displayed-field check walks
     the receipt's own members, of two values already known to be objects; the note on exit 0 asks
     only whether the signed bytes, already known to be an object, carry sequence and
-    previous_hash.)"""
+    previous_hash. The log checkpoint's inputs are not read through here: there a member written as
+    null is present, as THE LOG CHECKPOINT CHECKS below say.)"""
     return obj.get(name) if isinstance(obj, dict) else None
 
 
@@ -459,6 +469,93 @@ def tagged(value):
     return ("other", repr(value))
 
 
+# --- WHAT A PASS SAYS: one text in verify_receipt.py, bin/lab-verify, verify_offline.py and verify_chain.py ---
+# A pass is a statement about bytes and a key, and PASS_LINE says so after the verdict. A deadline the signed bytes
+# carry is reported as what the record says, never compared with a clock, for two kinds of record and no other. The
+# kind is read from the signed bytes (window_kind): a decision that allowed carries the verdict "allow" in its
+# metadata (WINDOW_DECISION: its deadline is exec_not_after, or not_after when that is absent, and its start is
+# decided_at); a statement is a record whose signed receipt_type is WINDOW_STATEMENT_TYPE and whose metadata carries
+# no verdict member and carries exp (WINDOW_STATEMENT: its deadline is exp, its start nbf). Every other record has no
+# window: a verdict that is not "allow" allowed nothing, a record of another kind that signs exp and no verdict is no
+# statement, and a record with no verdict and no exp is neither kind (a caller grant signs not_after, the day the
+# grant ends, which is no deadline for an execution). With an instant given (--at), that instant is compared with the signed values as text, which is
+# chronological order for the one accepted form: the window is open from its start (a record that signs none has
+# only its end compared) up to, and not at, its end. A member that is present and is not an instant of the accepted
+# form is said so and is never compared. No exit depends on any of it.
+PASS_LINE = (
+    "A pass shows these bytes were signed under the key you supplied. It is not permission to act. "
+    "Whether an action may run is decided by the issuing system when it runs."
+)
+# each kind: (the sentence its deadline is reported in, the members read as its end, the members read as its start)
+WINDOW_DECISION = ("This decision allowed execution until %s.", ("exec_not_after", "not_after"), ("decided_at",))
+WINDOW_STATEMENT = ("This statement was valid until %s.", ("exp",), ("nbf",))
+# the signed receipt_type of a statement record, the only kind whose exp is reported
+WINDOW_STATEMENT_TYPE = "requisition.lab.statement.v0"
+WINDOW_INSTANT_SHAPE = "dddd-dd-ddTdd:dd:ddZ"
+
+
+def window_instant(value):
+    """True for exactly YYYY-MM-DDTHH:MM:SSZ (ASCII digits) that is a real instant of the proleptic Gregorian
+    calendar: month 01 to 12, a day that month has in that year, hour 00 to 23, minute and second 00 to 59."""
+    if not (isinstance(value, str) and len(value) == 20
+            and all((c in "0123456789") if m == "d" else c == m for c, m in zip(value, WINDOW_INSTANT_SHAPE))):
+        return False
+    year, month, day = int(value[0:4]), int(value[5:7]), int(value[8:10])
+    if month < 1 or month > 12 or int(value[11:13]) > 23 or int(value[14:16]) > 59 or int(value[17:19]) > 59:
+        return False
+    leap = year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
+    return 1 <= day <= (31, 29 if leap else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)[month - 1]
+
+
+def window_kind(signed, metadata):
+    """WINDOW_DECISION, WINDOW_STATEMENT or None: the kind of record a deadline is reported for. A signed verdict
+    decides alone: a record that carries one is a decision, and it allowed only when the verdict is the text
+    "allow". A record that carries none is a statement when its signed receipt_type is WINDOW_STATEMENT_TYPE and it
+    carries exp, and is neither kind otherwise."""
+    if "verdict" in metadata:
+        return WINDOW_DECISION if metadata["verdict"] == "allow" else None
+    if signed.get("receipt_type") != WINDOW_STATEMENT_TYPE:
+        return None
+    return WINDOW_STATEMENT if "exp" in metadata else None
+
+
+def window_lines(signed, at=None):
+    """The lines about the record's window that follow PASS_LINE; `at` is None or an accepted instant."""
+    if not isinstance(signed, dict):
+        signed = {}
+    metadata = signed.get("metadata")
+    if not isinstance(metadata, dict):
+        metadata = {}
+    sentence, end_names, start_names = window_kind(signed, metadata) or (None, (), ())
+    end_name = next((name for name in end_names if name in metadata), None)
+    if end_name is None:
+        return [] if at is None else ["No time was compared: this record carries no execution window."]
+    end = metadata[end_name]
+    if not window_instant(end):
+        return [
+            "The signed %s is not a readable instant, so no deadline is reported." % end_name,
+            "No time was compared." if at is None
+            else "No time was compared: the signed %s is not a readable instant." % end_name,
+        ]
+    lines = [sentence % end]
+    if at is None:
+        return lines + ["No time was compared."]
+    start_name = next((name for name in start_names if name in metadata), None)
+    if start_name is None:
+        if at < end:
+            return lines + ["At %s the window was open (until %s; the record signs no start, so none was compared)." % (at, end)]
+        return lines + ["At %s the window was closed (it ended at %s)." % (at, end)]
+    start = metadata[start_name]
+    if not window_instant(start):
+        return lines + ["No time was compared: the signed %s is not a readable instant." % start_name]
+    if at < start:
+        return lines + ["At %s the window was closed (it opened at %s)." % (at, start)]
+    if at >= end:
+        return lines + ["At %s the window was closed (it ended at %s)." % (at, end)]
+    return lines + ["At %s the window was open (from %s, until %s)." % (at, start, end)]
+# --- end of WHAT A PASS SAYS ---
+
+
 # --- THE LOG CHECKPOINT CHECKS (CHECKPOINTS.md, beside this file) --------------------------------
 # Run only when --checkpoint is given, and only after the receipt itself VERIFIED (exit 0): an
 # answer about the log needs a receipt whose signature checked out. Three checks, in this order:
@@ -482,17 +579,29 @@ def tagged(value):
 #       no larger tree exists is not something a checkpoint can show.
 #
 # A key change of the log is followed only through the log's own signed key-transition record
-# (--key-transition): the old key, named in the policy, endorses the new one. Every refusal exits 5
+# (--key-transition): the old key, named in the policy, endorses the new one at a point (a size and
+# a root). When the held size is below that point, two RFC 9162 consistency proofs are required: from
+# the held tree to the endorsed point's tree, against the endorsed root (--held-to-transition-proof),
+# and from that point to the checkpoint (--consistency-proof). Without the first the checkpoint is
+# refused (checkpoint_consistency_unproven): the endorsement alone does not show that the endorsed
+# tree extends the tree the relying party holds. When the held size IS that point, the endorsed root
+# must be the held root (else checkpoint_split_view_at_held_size). Every refusal exits 5
 # (TRUST NOT ESTABLISHED): the receipt's signature checked out, and what is not established is the
 # log's account of it. A witness key of type 0x06 (ML-DSA-44) is refused by name: ML-DSA is outside
 # the primitives this file computes (THE RULE THIS FILE BOUNDS, above).
+#
+# Presence is the flag's and the member's, never the value's: a file given to a flag is given whatever
+# JSON value it holds (false, null, 0, "" or [] is judged as a proof or a key-transition record of the
+# wrong form), and a member written as null is present (a proof's hash is absent or "sha256"; its
+# leaf_hash, where written, must be the receipt's leaf hash; the receipt's cosignature, where written,
+# is a text or an object whose member signature is that text).
 
 CHECKPOINT_FLAGS = ("--checkpoint", "--inclusion-proof", "--witness-policy", "--held-size", "--held-root",
-                    "--consistency-proof", "--key-transition", "--held-state")
+                    "--consistency-proof", "--key-transition", "--held-state", "--held-to-transition-proof")
 CHECKPOINT_LEAF_TAG = b"requisition.lab.log.leaf.v1\n"
 CHECKPOINT_TRANSITION_TYPE = "requisition.lab.log.key_transition.v0"
 _CHECKPOINT_DECIMAL = re.compile(r"(0|[1-9][0-9]{0,17})\Z")
-_CHECKPOINT_THRESHOLD = re.compile(r"[+-]?[0-9]+\Z")
+_CHECKPOINT_THRESHOLD = re.compile(r"[1-9][0-9]{0,17}\Z")
 _CHECKPOINT_HEX4 = re.compile(r"[0-9a-f]{8}\Z")
 
 
@@ -734,10 +843,14 @@ def checkpoint_leaf(receipt):
     """The receipt's leaf in the lab's log, or CheckpointRefused (checkpoint_leaf_malformed)."""
     payload = receipt["signed_payload"].encode("utf-8")
     signature = _cp_b64(receipt["signature"])
-    cosignature = member(receipt, "cosignature")
-    if isinstance(cosignature, dict):
-        cosignature = member(cosignature, "signature")
-    co = b"" if cosignature is None else _cp_b64(cosignature)
+    # the member cosignature: a text, or an object whose member signature is that text; a record file without
+    # the member has none. A member written as null, or an object without signature, is present and neither.
+    co = b""
+    if "cosignature" in receipt:
+        cosignature = receipt["cosignature"]
+        if isinstance(cosignature, dict):
+            cosignature = cosignature.get("signature")
+        co = _cp_b64(cosignature)
     if signature is None or co is None or len(signature) >= 65536 or len(co) >= 65536:
         raise CheckpointRefused("checkpoint_leaf_malformed",
                                 "the receipt's signature or co-signature is not canonical base64 under 65,536 bytes")
@@ -746,8 +859,9 @@ def checkpoint_leaf(receipt):
 
 
 def _cp_proof(document, sizes):
-    """The proof hashes of a proof document whose hash is sha256 and whose sizes are `sizes`."""
-    if not isinstance(document, dict) or member(document, "hash") not in (None, "sha256"):
+    """The proof hashes of a proof document whose hash is absent or sha256 (a null is neither) and whose sizes are
+    `sizes`."""
+    if not isinstance(document, dict) or document.get("hash", "sha256") != "sha256":
         raise CheckpointRefused("checkpoint_proof_malformed", "a proof that is not an object over the SHA-256 tree")
     for name, value in sizes.items():
         found = member(document, name)
@@ -828,8 +942,8 @@ def checkpoint_check(receipt, inputs):
         raise CheckpointRefused("checkpoint_proof_malformed", "the inclusion proof has no integer leaf_index")
     proof = _cp_proof(document, {"tree_size": note["size"]})
     leaf_hash = _cp_hash(b"\x00" + checkpoint_leaf(receipt))
-    stated = member(document, "leaf_hash")
-    if stated is not None and _cp_b64(stated) != leaf_hash:
+    # leaf_hash, where the member is written (null included), must be this receipt's leaf hash
+    if "leaf_hash" in document and _cp_b64(document["leaf_hash"]) != leaf_hash:
         raise CheckpointRefused("checkpoint_inclusion_invalid", "the proof's leaf_hash is not this receipt's leaf")
     if not checkpoint_verify_inclusion(leaf_hash, index, note["size"], proof, note["root"]):
         raise CheckpointRefused("checkpoint_inclusion_invalid",
@@ -840,7 +954,8 @@ def checkpoint_check(receipt, inputs):
         raise CheckpointUsage("the held-state file is for the log %r, not %r" % (held[2], note["origin"]))
     if new is not None:
         # the new key signs only checkpoints at or after the point the old key endorsed it at, and at that point the
-        # endorsed root; a held tree older than that point is checked from it
+        # endorsed root; a held tree older than that point must be proven extended by the endorsed tree, and is then
+        # checked from it
         if note["size"] < new["size"]:
             raise CheckpointRefused("checkpoint_before_transition",
                                     "the checkpoint's size %d is below the key transition's size %d"
@@ -848,9 +963,23 @@ def checkpoint_check(receipt, inputs):
         if note["size"] == new["size"] and note["root"] != new["root"]:
             raise CheckpointRefused("checkpoint_transition_root_mismatch",
                                     "size %d: the checkpoint's root is not the root the key transition names" % new["size"])
+        if held is not None and held[0] == new["size"] and held[1] != new["root"]:
+            raise CheckpointRefused("checkpoint_split_view_at_held_size",
+                                    "size %d: the root the key transition names is not the held root" % held[0])
         if held is not None and held[0] < new["size"]:
-            lines.append("held size %d is below the key transition at size %d: checked from the transition point"
-                         % (held[0], new["size"]))
+            if "held-to-transition-proof" not in inputs:
+                raise CheckpointRefused("checkpoint_consistency_unproven",
+                                        "the held size %d is below the key transition at size %d and no proof from "
+                                        "the held tree to the transition point is given (--held-to-transition-proof)"
+                                        % (held[0], new["size"]))
+            proof = _cp_proof(inputs["held-to-transition-proof"], {"old": held[0], "new": new["size"]})
+            if not checkpoint_verify_consistency(held[0], new["size"], proof, held[1], new["root"]):
+                raise CheckpointRefused("checkpoint_consistency_invalid", "the tree the key transition names at size %d "
+                                        "does not extend the held tree of size %d" % (new["size"], held[0]))
+            lines.append("held size %d is below the key transition at size %d: the transition's tree extends the held "
+                         "tree (RFC 9162 consistency proof %d -> %d, --held-to-transition-proof); the checkpoint is "
+                         "compared with the transition's tree (--consistency-proof from size %d)"
+                         % (held[0], new["size"], held[0], new["size"], new["size"]))
             held = (new["size"], new["root"], held[2])
     if held is None:
         lines.append("%s: a checkpoint older than a size the relying party holds is not refused"
@@ -923,6 +1052,10 @@ def checkpoint_inputs(opts):
     held = checkpoint_held(opts)
     if "consistency-proof" in opts and held is None and "held-state" not in opts:
         raise CheckpointUsage("--consistency-proof proves consistency with a held size: give one")
+    if "held-to-transition-proof" in opts and (
+            "key-transition" not in opts or (held is None and "held-state" not in opts)):
+        raise CheckpointUsage("--held-to-transition-proof proves that a key transition's tree extends a held size: "
+                              "give a held size and --key-transition")
     if "write-held-state" in opts and "held-state" not in opts:
         raise CheckpointUsage("--write-held-state writes the file --held-state names")
     inputs = {"held": held}
@@ -932,7 +1065,7 @@ def checkpoint_inputs(opts):
         if len(raw) > MAX_INPUT_BYTES:
             raise CheckpointUsage("%s is larger than %d bytes" % (opts[name], MAX_INPUT_BYTES))
         inputs[name] = raw
-    for name in ("inclusion-proof", "consistency-proof", "key-transition"):
+    for name in ("inclusion-proof", "consistency-proof", "key-transition", "held-to-transition-proof"):
         if name in opts:
             inputs[name] = read_json(opts[name])
     for name in ("held-state", "write-held-state"):
@@ -953,7 +1086,7 @@ def main(argv):
     index = 0
     while index < len(argv):
         flag = argv[index]
-        if flag in ("--receipt", "--registry") + CHECKPOINT_FLAGS:
+        if flag in ("--receipt", "--registry", "--at") + CHECKPOINT_FLAGS:
             if index + 1 >= len(argv):
                 die(EXIT_USAGE, "usage: %s requires a value" % flag)
             opts[flag[2:]] = argv[index + 1]
@@ -962,10 +1095,16 @@ def main(argv):
             opts["write-held-state"] = True
             index += 1
         else:
-            index += 1
+            # An argument this verifier does not take is refused, never skipped: a skipped "--att TIME" would be a
+            # pass with no comparison where the caller asked for one, in silence. The argument is not echoed.
+            die(EXIT_USAGE, "usage: argument %d is not one this verifier takes" % (index + 1))
 
     if "receipt" not in opts:
         die(EXIT_USAGE, "usage: verify_receipt.py --receipt RECEIPT.json --registry REGISTRY.json")
+
+    # WHAT A PASS SAYS: the time is judged as an argument, before anything is read. It changes no verdict.
+    if "at" in opts and not window_instant(opts["at"]):
+        die(EXIT_USAGE, "usage: --at takes one instant of the form YYYY-MM-DDTHH:MM:SSZ")
 
     # DEFAULT DISTRUST. Without an independently supplied registry there is no basis to judge the
     # receipt, and taking the key from the bundle would be checking a signature against a key the
@@ -1291,6 +1430,9 @@ def main(argv):
         "%s" % (key_id, status, note)
     )
     for line in checkpoint_lines:
+        print(line)
+    print()
+    for line in [PASS_LINE] + window_lines(signed, opts.get("at")):
         print(line)
     sys.exit(EXIT_VERIFIED)
 

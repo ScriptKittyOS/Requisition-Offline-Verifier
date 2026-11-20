@@ -1,0 +1,6 @@
+{
+  "key_id": "requisition_lab_dev_ed25519_v0",
+  "receipt_hash": "3fe90c90deada28751073b3f7741df051cf32934efa0bb0d8a7a890161a9d68f",
+  "signature": "zUhM+hSJaxErl3qR4MR7szm3mAHIGscCRG+VibsZGvynFkWPwwQHg0ZZB3iRiu8Di3rY5X/T6rZCozkgkbRXAQ==",
+  "signed_payload": "{\"chain_scope\":\"requisition-lab:log\",\"metadata\":{\"endorsement\":\"1iUDpc5/PG6V43BuUg9CzF9YAL4HFP2MVLg8k1Ci9PJOuzVYyd5PwZ+o8mOhh3MFzDU8Doh/TqUuYuxVNhCcAw==\",\"hands\":\"one-person\",\"key_id\":\"requisition_lab_dev_ed25519_v0\",\"n6_profile\":\"not_followed\",\"new_key_id\":\"requisition_lab_dev_ed25519_v0\",\"new_public_key\":\"4t8zZPzcG9va6dlSatxuld/TnXYME1s1rFC0qCrTgL4=\",\"origin\":\"requisition-lab.invalid/checkpoint-vectors\",\"previous_checkpoint_root_sha256\":\"8jv87MOy9z3e91zp/HXLrjgweDPJgtB4ThSeKNOG/Xo=\",\"previous_checkpoint_size\":7,\"previous_public_key\":\"hPPCm2COefUfHH6h9yQ5gA+MP9dQBxOfHJG7MUmAWsc=\",\"profile\":\"lab\",\"signer\":\"dev\"},\"occurred_at\":\"2026-11-20T03:02:45Z\",\"payload_hash\":null,\"previous_hash\":null,\"receipt_type\":\"requisition.lab.log.key_transition.v0\",\"schema_version\":\"agent_receipt.v1\",\"sequence\":1,\"status\":\"recorded\",\"subject_id\":\"requisition-lab.invalid/checkpoint-vectors\",\"subject_type\":\"requisition.lab.log\"}"
+}

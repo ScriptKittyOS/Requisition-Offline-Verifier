@@ -19,16 +19,24 @@
 #       proof from the held tree that verifies.
 #
 # A key change of the log is followed only through the log's signed key-transition record, endorsed
-# by an old key the policy names. Every refusal exits 5. An ML-DSA-44 (type 0x06) witness key is
+# by an old key the policy names at a point (a size and a root). A held tree older than that point needs
+# two RFC 9162 consistency proofs: from the held tree to the endorsed point's tree, against the endorsed
+# root (--held-to-transition-proof), and from that point to the checkpoint. A held tree AT that point must have
+# the endorsed root (else checkpoint_split_view_at_held_size). Every refusal exits 5. An ML-DSA-44 (type 0x06) witness key is
 # refused by name: this file computes Ed25519 only.
+#
+# Presence is the flag's and the member's, never the value's: a file given to a flag is given whatever JSON value it
+# holds (false, null, 0, "" or [] is judged as a proof or a key-transition record of the wrong form), and a member
+# written as null is present (a proof's hash is absent or "sha256"; its leaf_hash, where written, must be the receipt's
+# leaf hash; the receipt's cosignature, where written, is a text or an object whose member signature is that text).
 defmodule LogCheckpoint do
   import Bitwise
 
-  @flags ~w(--checkpoint --inclusion-proof --witness-policy --held-size --held-root --consistency-proof --key-transition --held-state)
+  @flags ~w(--checkpoint --inclusion-proof --witness-policy --held-size --held-root --consistency-proof --key-transition --held-state --held-to-transition-proof)
   @leaf_tag "requisition.lab.log.leaf.v1\n"
   @transition_type "requisition.lab.log.key_transition.v0"
   @decimal ~r/\A(0|[1-9][0-9]{0,17})\z/
-  @threshold ~r/\A[+-]?[0-9]+\z/
+  @threshold ~r/\A[1-9][0-9]{0,17}\z/
   @hex4 ~r/\A[0-9a-f]{8}\z/
 
   def flags, do: @flags
@@ -290,15 +298,17 @@ defmodule LogCheckpoint do
 
   # ------------------------------------------------------------------ the leaf and the proofs
 
+  # The member cosignature is a text, or an object whose member signature is that text; a record file without the
+  # member has none. A member written as null, or an object without signature, is present and neither.
   def leaf(receipt) do
-    co =
-      case Map.get(receipt, "cosignature") do
-        %{} = envelope -> Map.get(envelope, "signature")
-        other -> other
+    cosignature =
+      case Map.fetch(receipt, "cosignature") do
+        :error -> <<>>
+        {:ok, %{} = envelope} -> b64(Map.get(envelope, "signature"))
+        {:ok, text} -> b64(text)
       end
 
     signature = b64(receipt["signature"])
-    cosignature = if co == nil, do: <<>>, else: b64(co)
 
     if signature == nil or cosignature == nil or byte_size(signature) >= 65_536 or byte_size(cosignature) >= 65_536,
       do: refuse("checkpoint_leaf_malformed", "the receipt's signature or co-signature is not canonical base64 under 65,536 bytes")
@@ -310,8 +320,9 @@ defmodule LogCheckpoint do
       payload <> <<byte_size(signature)::16>> <> signature <> <<byte_size(cosignature)::16>> <> cosignature
   end
 
+  # a proof's hash is absent or "sha256": a member written as null is neither
   defp proof(document, sizes) do
-    if not (is_map(document) and Map.get(document, "hash") in [nil, "sha256"]),
+    if not (is_map(document) and Map.get(document, "hash", "sha256") == "sha256"),
       do: refuse("checkpoint_proof_malformed", "a proof that is not an object over the SHA-256 tree")
 
     for {name, value} <- sizes do
@@ -445,6 +456,13 @@ defmodule LogCheckpoint do
       if Map.has_key?(opts, "--consistency-proof") and held == nil and not Map.has_key?(opts, "--held-state"),
         do: usage("--consistency-proof proves consistency with a held size: give one")
 
+      if Map.has_key?(opts, "--held-to-transition-proof") and
+           (not Map.has_key?(opts, "--key-transition") or (held == nil and not Map.has_key?(opts, "--held-state"))),
+         do:
+           usage(
+             "--held-to-transition-proof proves that a key transition's tree extends a held size: give a held size and --key-transition"
+           )
+
       if Map.has_key?(opts, "--write-held-state") and not Map.has_key?(opts, "--held-state"),
         do: usage("--write-held-state writes the file --held-state names")
 
@@ -463,13 +481,19 @@ defmodule LogCheckpoint do
         end
       end
 
+      # An optional JSON file is {:given, its value} when its flag is given, else :not_given. Whether a file was
+      # given is the flag's, never its value's: a file holding false, null, 0, "" or [] is a given value, judged
+      # as a key-transition record or a proof of the wrong form, never read as the flag left out.
+      given = fn flag -> if Map.has_key?(opts, flag), do: {:given, json.(flag)}, else: :not_given end
+
       %{
         held: held,
         checkpoint: bytes.("--checkpoint"),
         policy: bytes.("--witness-policy"),
         inclusion: json.("--inclusion-proof"),
-        consistency: Map.has_key?(opts, "--consistency-proof") && json.("--consistency-proof"),
-        transition: Map.has_key?(opts, "--key-transition") && json.("--key-transition"),
+        consistency: given.("--consistency-proof"),
+        transition: given.("--key-transition"),
+        held_transition: given.("--held-to-transition-proof"),
         state: opts["--held-state"],
         write: Map.has_key?(opts, "--write-held-state")
       }
@@ -482,13 +506,15 @@ defmodule LogCheckpoint do
     note = note(i.checkpoint)
 
     {logs, transition_lines, point} =
-      if i.transition do
-        {old, new} = transition(i.transition, note.origin, policy.logs, decode)
+      case i.transition do
+        {:given, record} ->
+          {old, new} = transition(record, note.origin, policy.logs, decode)
 
-        {Enum.map(policy.logs, &if(&1 == old, do: new, else: &1)),
-         ["key transition at size #{new.size}: the log key #{hex(old.id)} endorsed the key #{hex(new.id)}"], new}
-      else
-        {policy.logs, [], nil}
+          {Enum.map(policy.logs, &if(&1 == old, do: new, else: &1)),
+           ["key transition at size #{new.size}: the log key #{hex(old.id)} endorsed the key #{hex(new.id)}"], new}
+
+        :not_given ->
+          {policy.logs, [], nil}
       end
 
     cosigners = cosigned(policy, note, logs)
@@ -509,17 +535,22 @@ defmodule LogCheckpoint do
     if not is_integer(index), do: refuse("checkpoint_proof_malformed", "the inclusion proof has no integer leaf_index")
     path = proof(document, [{"tree_size", note.size}])
     leaf_hash = h(<<0>> <> leaf(receipt))
-    stated = Map.get(document, "leaf_hash")
+    # leaf_hash, where the member is written (null included), must be this receipt's leaf hash
+    case Map.fetch(document, "leaf_hash") do
+      {:ok, stated} ->
+        if b64(stated) != leaf_hash,
+          do: refuse("checkpoint_inclusion_invalid", "the proof's leaf_hash is not this receipt's leaf")
 
-    if stated != nil and b64(stated) != leaf_hash,
-      do: refuse("checkpoint_inclusion_invalid", "the proof's leaf_hash is not this receipt's leaf")
+      :error ->
+        :ok
+    end
 
     if not verify_inclusion(leaf_hash, index, note.size, path, note.root),
       do: refuse("checkpoint_inclusion_invalid", "the receipt is not leaf #{index} of the tree of size #{note.size}")
 
     lines = lines ++ ["the receipt is leaf #{index} of #{note.size} (RFC 9162 inclusion proof, SHA-256)"]
 
-    {held, point_lines} = after_transition(point, note, i.held)
+    {held, point_lines} = after_transition(point, note, i.held, i.held_transition)
     lines = lines ++ point_lines
 
     held_line =
@@ -541,10 +572,16 @@ defmodule LogCheckpoint do
           "not older than the held size #{m}: the same root"
 
         {m, root, _origin} ->
-          if i.consistency in [false, nil],
-            do: refuse("checkpoint_consistency_unproven", "the checkpoint is larger than the held size #{m} and no consistency proof is given")
+          document =
+            case i.consistency do
+              {:given, document} ->
+                document
 
-          path = proof(i.consistency, [{"old", m}, {"new", note.size}])
+              :not_given ->
+                refuse("checkpoint_consistency_unproven", "the checkpoint is larger than the held size #{m} and no consistency proof is given")
+            end
+
+          path = proof(document, [{"old", m}, {"new", note.size}])
 
           if not verify_consistency(m, note.size, path, root, note.root),
             do: refuse("checkpoint_consistency_invalid", "the tree of size #{note.size} does not extend the held tree of size #{m}")
@@ -560,13 +597,14 @@ defmodule LogCheckpoint do
   end
 
   # the new key signs only checkpoints at or after the point the old key endorsed it at, and at that point the endorsed
-  # root; a held tree older than that point is checked from it. The held-state file's log is compared first.
-  defp after_transition(_point, note, {_size, _root, origin}) when origin != nil and origin != note.origin,
+  # root; a held tree older than that point must be proven extended by the endorsed tree, and is then checked from it.
+  # The held-state file's log is compared first.
+  defp after_transition(_point, note, {_size, _root, origin}, _proof) when origin != nil and origin != note.origin,
     do: usage("the held-state file is for the log #{inspect(origin)}, not #{inspect(note.origin)}")
 
-  defp after_transition(nil, _note, held), do: {held, []}
+  defp after_transition(nil, _note, held, _proof), do: {held, []}
 
-  defp after_transition(point, note, held) do
+  defp after_transition(point, note, held, held_proof) do
     if note.size < point.size,
       do: refuse("checkpoint_before_transition", "the checkpoint's size #{note.size} is below the key transition's size #{point.size}")
 
@@ -574,9 +612,37 @@ defmodule LogCheckpoint do
       do: refuse("checkpoint_transition_root_mismatch", "size #{point.size}: the checkpoint's root is not the root the key transition names")
 
     case held do
-      {m, _root, origin} when m < point.size ->
+      {m, root, _origin} when m == point.size and root != point.root ->
+        refuse("checkpoint_split_view_at_held_size", "size #{m}: the root the key transition names is not the held root")
+
+      {m, root, origin} when m < point.size ->
+        document =
+          case held_proof do
+            {:given, document} ->
+              document
+
+            :not_given ->
+              refuse(
+                "checkpoint_consistency_unproven",
+                "the held size #{m} is below the key transition at size #{point.size} and no proof from the held tree to the transition point is given (--held-to-transition-proof)"
+              )
+          end
+
+        path = proof(document, [{"old", m}, {"new", point.size}])
+
+        if not verify_consistency(m, point.size, path, root, point.root),
+          do:
+            refuse(
+              "checkpoint_consistency_invalid",
+              "the tree the key transition names at size #{point.size} does not extend the held tree of size #{m}"
+            )
+
         {{point.size, point.root, origin},
-         ["held size #{m} is below the key transition at size #{point.size}: checked from the transition point"]}
+         [
+           "held size #{m} is below the key transition at size #{point.size}: the transition's tree extends the held tree " <>
+             "(RFC 9162 consistency proof #{m} -> #{point.size}, --held-to-transition-proof); the checkpoint is " <>
+             "compared with the transition's tree (--consistency-proof from size #{point.size})"
+         ]}
 
       _ ->
         {held, []}

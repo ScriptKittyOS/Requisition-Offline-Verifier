@@ -6,12 +6,16 @@
 #
 #   lib/verify_receipt.ex   = sources/verify_receipt.exs without its "#!" line, without the script's last-resort
 #                             block (from the line "# Last resort, ..." to the end; RequisitionReceiptVerifier.CLI
-#                             carries that block), and with its one Code.require_file line replaced by a comment
-#                             (LogCheckpoint is compiled with the package, so there is nothing to load)
+#                             carries that block), with its one Code.require_file line replaced by a comment
+#                             (LogCheckpoint is compiled with the package, so there is nothing to load), and with
+#                             its one top-level line, which loads the crypto application before the script's first
+#                             module, replaced by a comment (in a package that line would run when the package is
+#                             compiled, not when the command runs; RequisitionReceiptVerifier.CLI.main/1 carries it)
 #   lib/log_checkpoint.ex   = sources/verify_receipt_checkpoint.exs without its "#!" line
 #   lib/requisition_receipt_verifier/cli.ex
-#                           = RequisitionReceiptVerifier.CLI.main/1: the script's last-resort block, its comment and
-#                             code, indented into the function, with System.argv() replaced by the argument argv
+#                           = RequisitionReceiptVerifier.CLI.main/1: the script's line that loads the crypto
+#                             application, then the script's last-resort block, its comment and code, indented
+#                             into the function, with System.argv() replaced by the argument argv
 #
 # In all three, each of the scripts' module names (mapping/0), as a whole word not preceded by a dot, becomes its name
 # under RequisitionReceiptVerifier, comments included; no string literal of the scripts holds one of these names.
@@ -21,6 +25,8 @@ defmodule Derive do
   @require ~s|          Code.require_file("verify_receipt_checkpoint.exs", __DIR__)\n|
   @packaged "          # (packaged: LogCheckpoint is compiled with this module; nothing is loaded here)\n"
   @last_resort "# Last resort, for an exception no check above foresaw."
+  @load_crypto ":application.load(:crypto)"
+  @load_packaged "# (packaged: RequisitionReceiptVerifier.CLI.main/1 loads the crypto application; nothing runs here)"
 
   @mapping %{
     "Ed25519Strict" => "RequisitionReceiptVerifier.Ed25519Strict",
@@ -52,7 +58,13 @@ defmodule Derive do
     1 = count(text, @require)
     [body, _block] = String.split(text, @last_resort, parts: 2)
     1 = count(text, @last_resort)
-    String.replace(body, @require, @packaged) |> String.trim_trailing() |> Kernel.<>("\n")
+    1 = count(body, "\n" <> @load_crypto <> "\n")
+
+    body
+    |> String.replace(@require, @packaged)
+    |> String.replace("\n" <> @load_crypto <> "\n", "\n" <> @load_packaged <> "\n")
+    |> String.trim_trailing()
+    |> Kernel.<>("\n")
   end
 
   defp cli(text) do
@@ -67,6 +79,7 @@ defmodule Derive do
       @moduledoc "The command line of verify_receipt.exs, as an escript and a Mix task: the same flags, output and exits."
 
       def main(argv) do
+        #{@load_crypto}
     #{indented}
       end
     end

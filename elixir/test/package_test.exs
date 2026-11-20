@@ -6,10 +6,11 @@ defmodule RequisitionReceiptVerifier.PackageTest do
   use ExUnit.Case, async: true
 
   @root Path.expand("..", __DIR__)
-  # verify_receipt.exs and verify_receipt_checkpoint.exs of requisition main 61e49fea (its verifier SHA256SUMS)
+  # the two scripts after the changes for the next release (PROVENANCE.md, "Changes to the verifier for the next
+  # release"), which follow those of 2026-11-19
   @sources %{
-    "sources/verify_receipt.exs" => "d8b618dc6fadd7557981fd62e7e3520708b741085ff9cc6c1569b8fb5f4fdbe0",
-    "sources/verify_receipt_checkpoint.exs" => "b60a950096ba703050fa553577245703980d30f4c0fad97db918353af64aac28"
+    "sources/verify_receipt.exs" => "145e062865809dc88ab616629022e0579dbc32d04efc93c8700707dcf72d4800",
+    "sources/verify_receipt_checkpoint.exs" => "c575f8875d67eba418b4853db2f7cbd67a0dc79d1eda60f9920f7746e578e9b4"
   }
   @apache "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
   @spdx "# SPDX-License-Identifier: Apache-2.0"

@@ -1,0 +1,1156 @@
+{
+ "schema": "requisition_pass_lines_vectors.v1",
+ "note": "ONE vector file for every verifier. Each verifier's test builds a real signed record of the kind named (a decision, a statement, a cease: a record-only act, or a grant: a record shaped as a caller grant, which signs no verdict), whose signed metadata carries none of verdict, exec_not_after, exp, not_after, nbf, decided_at except the members given under metadata, exactly as given (a null is a present null). A deadline is reported for two kinds of record, by what the signed metadata carries (members): a decision that allowed (the verdict is the text allow; its deadline is the first present member of its end list, its start the first of its start list) and a statement (a record of the statement kind, requisition.lab.statement.v0, with no verdict member, and exp). A record of another kind that signs exp and no verdict is no statement. Every other record has no window. The record passes; the last lines of the pass are pass_line and then lines, for the time given as --at (null: no time given). Each value under malformed_at is refused as a usage error before anything is checked. On a failure pass_line is not printed. No exit depends on a time. Each row under unknown_arguments is a list of arguments added to a valid invocation: it is refused as a usage error before anything is checked, because a verifier that skipped an argument it does not know would pass in silence where the caller asked for a comparison. Each name under unknown_options is the same row for a verifier that is a library: an option it does not take, given with a time as its value, is refused.",
+ "pass_line": "A pass shows these bytes were signed under the key you supplied. It is not permission to act. Whether an action may run is decided by the issuing system when it runs.",
+ "members": {
+  "decision": {
+   "verdict": "allow",
+   "end": [
+    "exec_not_after",
+    "not_after"
+   ],
+   "start": [
+    "decided_at"
+   ]
+  },
+  "statement": {
+   "verdict": null,
+   "end": [
+    "exp"
+   ],
+   "start": [
+    "nbf"
+   ]
+  }
+ },
+ "vectors": [
+  {
+   "name": "allow_no_time",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "decided_at": "2026-11-13T15:56:48Z",
+    "exec_not_after": "2026-11-13T15:57:48Z",
+    "not_after": "2026-11-13T15:58:48Z"
+   },
+   "at": null,
+   "lines": [
+    "This decision allowed execution until 2026-11-13T15:57:48Z.",
+    "No time was compared."
+   ],
+   "why": "an allow as the issuing system signs it; exec_not_after is reported, not not_after"
+  },
+  {
+   "name": "allow_before_start",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "decided_at": "2026-11-13T15:56:48Z",
+    "exec_not_after": "2026-11-13T15:57:48Z",
+    "not_after": "2026-11-13T15:58:48Z"
+   },
+   "at": "2026-11-13T15:56:47Z",
+   "lines": [
+    "This decision allowed execution until 2026-11-13T15:57:48Z.",
+    "At 2026-11-13T15:56:47Z the window was closed (it opened at 2026-11-13T15:56:48Z)."
+   ],
+   "why": "one second before decided_at"
+  },
+  {
+   "name": "allow_at_start",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "decided_at": "2026-11-13T15:56:48Z",
+    "exec_not_after": "2026-11-13T15:57:48Z",
+    "not_after": "2026-11-13T15:58:48Z"
+   },
+   "at": "2026-11-13T15:56:48Z",
+   "lines": [
+    "This decision allowed execution until 2026-11-13T15:57:48Z.",
+    "At 2026-11-13T15:56:48Z the window was open (from 2026-11-13T15:56:48Z, until 2026-11-13T15:57:48Z)."
+   ],
+   "why": "the start is inside the window"
+  },
+  {
+   "name": "allow_last_second",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "decided_at": "2026-11-13T15:56:48Z",
+    "exec_not_after": "2026-11-13T15:57:48Z",
+    "not_after": "2026-11-13T15:58:48Z"
+   },
+   "at": "2026-11-13T15:57:47Z",
+   "lines": [
+    "This decision allowed execution until 2026-11-13T15:57:48Z.",
+    "At 2026-11-13T15:57:47Z the window was open (from 2026-11-13T15:56:48Z, until 2026-11-13T15:57:48Z)."
+   ],
+   "why": "one second before the end"
+  },
+  {
+   "name": "allow_at_end",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "decided_at": "2026-11-13T15:56:48Z",
+    "exec_not_after": "2026-11-13T15:57:48Z",
+    "not_after": "2026-11-13T15:58:48Z"
+   },
+   "at": "2026-11-13T15:57:48Z",
+   "lines": [
+    "This decision allowed execution until 2026-11-13T15:57:48Z.",
+    "At 2026-11-13T15:57:48Z the window was closed (it ended at 2026-11-13T15:57:48Z)."
+   ],
+   "why": "the end is outside the window: the issuing system acts only before it"
+  },
+  {
+   "name": "allow_after_end",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "decided_at": "2026-11-13T15:56:48Z",
+    "exec_not_after": "2026-11-13T15:57:48Z",
+    "not_after": "2026-11-13T15:58:48Z"
+   },
+   "at": "2027-01-01T00:00:00Z",
+   "lines": [
+    "This decision allowed execution until 2026-11-13T15:57:48Z.",
+    "At 2027-01-01T00:00:00Z the window was closed (it ended at 2026-11-13T15:57:48Z)."
+   ],
+   "why": "an expired decision is still a valid record"
+  },
+  {
+   "name": "statement_no_time",
+   "kind": "statement",
+   "metadata": {
+    "nbf": "2026-11-13T15:56:38Z",
+    "exp": "2026-11-13T16:01:38Z"
+   },
+   "at": null,
+   "lines": [
+    "This statement was valid until 2026-11-13T16:01:38Z.",
+    "No time was compared."
+   ],
+   "why": "a statement as the issuing system signs it: exp"
+  },
+  {
+   "name": "statement_open",
+   "kind": "statement",
+   "metadata": {
+    "nbf": "2026-11-13T15:56:38Z",
+    "exp": "2026-11-13T16:01:38Z"
+   },
+   "at": "2026-11-13T15:56:48Z",
+   "lines": [
+    "This statement was valid until 2026-11-13T16:01:38Z.",
+    "At 2026-11-13T15:56:48Z the window was open (from 2026-11-13T15:56:38Z, until 2026-11-13T16:01:38Z)."
+   ],
+   "why": "nbf <= at < exp"
+  },
+  {
+   "name": "statement_before_nbf",
+   "kind": "statement",
+   "metadata": {
+    "nbf": "2026-11-13T15:56:38Z",
+    "exp": "2026-11-13T16:01:38Z"
+   },
+   "at": "2026-11-13T15:56:37Z",
+   "lines": [
+    "This statement was valid until 2026-11-13T16:01:38Z.",
+    "At 2026-11-13T15:56:37Z the window was closed (it opened at 2026-11-13T15:56:38Z)."
+   ],
+   "why": "one second before nbf"
+  },
+  {
+   "name": "statement_at_exp",
+   "kind": "statement",
+   "metadata": {
+    "nbf": "2026-11-13T15:56:38Z",
+    "exp": "2026-11-13T16:01:38Z"
+   },
+   "at": "2026-11-13T16:01:38Z",
+   "lines": [
+    "This statement was valid until 2026-11-13T16:01:38Z.",
+    "At 2026-11-13T16:01:38Z the window was closed (it ended at 2026-11-13T16:01:38Z)."
+   ],
+   "why": "exp is outside the window"
+  },
+  {
+   "name": "statement_no_nbf_open",
+   "kind": "statement",
+   "metadata": {
+    "exp": "2026-11-13T16:01:38Z"
+   },
+   "at": "2026-11-13T15:56:48Z",
+   "lines": [
+    "This statement was valid until 2026-11-13T16:01:38Z.",
+    "At 2026-11-13T15:56:48Z the window was open (until 2026-11-13T16:01:38Z; the record signs no start, so none was compared)."
+   ],
+   "why": "a statement that signs no nbf: only exp is compared, and the line says so"
+  },
+  {
+   "name": "statement_decision_members_not_read",
+   "kind": "statement",
+   "metadata": {
+    "nbf": "2026-11-13T15:56:38Z",
+    "exp": "2026-11-13T16:01:38Z",
+    "decided_at": "2026-11-13T15:56:58Z",
+    "exec_not_after": "2026-11-13T15:57:48Z",
+    "not_after": "2026-11-13T15:58:48Z"
+   },
+   "at": "2026-11-13T15:56:48Z",
+   "lines": [
+    "This statement was valid until 2026-11-13T16:01:38Z.",
+    "At 2026-11-13T15:56:48Z the window was open (from 2026-11-13T15:56:38Z, until 2026-11-13T16:01:38Z)."
+   ],
+   "why": "a statement's window is nbf to exp; a decision's members it also carries are not read"
+  },
+  {
+   "name": "deny_no_time",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "deny",
+    "decided_at": "2026-11-13T15:56:48Z",
+    "not_after": "2026-11-13T15:58:48Z"
+   },
+   "at": null,
+   "lines": [],
+   "why": "a deny carries not_after and allowed nothing: no deadline, and no window to compare"
+  },
+  {
+   "name": "deny_at",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "deny",
+    "decided_at": "2026-11-13T15:56:48Z",
+    "not_after": "2026-11-13T15:58:48Z"
+   },
+   "at": "2026-11-13T15:56:48Z",
+   "lines": [
+    "No time was compared: this record carries no execution window."
+   ],
+   "why": "a time was given and the record has no window"
+  },
+  {
+   "name": "cease_no_time",
+   "kind": "cease",
+   "metadata": {
+    "verdict": "recorded_no_authority",
+    "decided_at": "2026-11-13T15:56:48Z",
+    "not_after": "2026-11-13T15:58:48Z"
+   },
+   "at": null,
+   "lines": [],
+   "why": "a record-only act authorises nothing"
+  },
+  {
+   "name": "cease_at",
+   "kind": "cease",
+   "metadata": {
+    "verdict": "recorded_no_authority",
+    "decided_at": "2026-11-13T15:56:48Z",
+    "not_after": "2026-11-13T15:58:48Z"
+   },
+   "at": "2026-11-13T15:56:48Z",
+   "lines": [
+    "No time was compared: this record carries no execution window."
+   ],
+   "why": "a time was given and the record has no window"
+  },
+  {
+   "name": "grant_no_time",
+   "kind": "grant",
+   "metadata": {
+    "not_after": "2027-11-13T00:00:00Z"
+   },
+   "at": null,
+   "lines": [],
+   "why": "a caller grant signs not_after, the day the grant ends, and no verdict: it is no decision and no statement, so no deadline is reported"
+  },
+  {
+   "name": "grant_at",
+   "kind": "grant",
+   "metadata": {
+    "not_after": "2027-11-13T00:00:00Z"
+   },
+   "at": "2026-12-01T00:00:00Z",
+   "lines": [
+    "No time was compared: this record carries no execution window."
+   ],
+   "why": "a time was given and a caller grant has no execution window"
+  },
+  {
+   "name": "no_verdict_exec_not_after",
+   "kind": "grant",
+   "metadata": {
+    "decided_at": "2026-11-13T15:56:48Z",
+    "exec_not_after": "2026-11-13T15:57:48Z"
+   },
+   "at": null,
+   "lines": [],
+   "why": "no signed verdict: a decision's members alone do not make a record a decision"
+  },
+  {
+   "name": "no_verdict_exec_not_after_at",
+   "kind": "grant",
+   "metadata": {
+    "decided_at": "2026-11-13T15:56:48Z",
+    "exec_not_after": "2026-11-13T15:57:48Z"
+   },
+   "at": "2026-11-13T15:56:48Z",
+   "lines": [
+    "No time was compared: this record carries no execution window."
+   ],
+   "why": "no signed verdict and a time given: nothing is compared"
+  },
+  {
+   "name": "other_kind_with_exp",
+   "kind": "grant",
+   "metadata": {
+    "nbf": "2026-11-13T15:56:38Z",
+    "exp": "2026-11-13T16:01:38Z"
+   },
+   "at": null,
+   "lines": [],
+   "why": "a record of another kind (shaped as a caller grant) that signs exp and no verdict is no statement: only a statement record's exp is reported as a statement's deadline"
+  },
+  {
+   "name": "other_kind_with_exp_at",
+   "kind": "grant",
+   "metadata": {
+    "nbf": "2026-11-13T15:56:38Z",
+    "exp": "2026-11-13T16:01:38Z"
+   },
+   "at": "2026-11-13T15:56:48Z",
+   "lines": [
+    "No time was compared: this record carries no execution window."
+   ],
+   "why": "a time was given and a record of another kind with exp has no window"
+  },
+  {
+   "name": "verdict_null_with_exp",
+   "kind": "statement",
+   "metadata": {
+    "verdict": null,
+    "nbf": "2026-11-13T15:56:38Z",
+    "exp": "2026-11-13T16:01:38Z"
+   },
+   "at": null,
+   "lines": [],
+   "why": "a verdict member that is present, even null, makes the record no statement; it is not the text allow, so it allowed nothing"
+  },
+  {
+   "name": "verdict_deny_with_exp",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "deny",
+    "nbf": "2026-11-13T15:56:38Z",
+    "exp": "2026-11-13T16:01:38Z"
+   },
+   "at": "2026-11-13T15:56:48Z",
+   "lines": [
+    "No time was compared: this record carries no execution window."
+   ],
+   "why": "a deny that also carries exp allowed nothing"
+  },
+  {
+   "name": "no_members_no_time",
+   "kind": "statement",
+   "metadata": {},
+   "at": null,
+   "lines": [],
+   "why": "no window member at all"
+  },
+  {
+   "name": "no_members_at",
+   "kind": "statement",
+   "metadata": {},
+   "at": "2026-11-13T15:56:48Z",
+   "lines": [
+    "No time was compared: this record carries no execution window."
+   ],
+   "why": "a time was given and the record has no window member"
+  },
+  {
+   "name": "verdict_not_text",
+   "kind": "decision",
+   "metadata": {
+    "verdict": [
+     "allow"
+    ],
+    "exec_not_after": "2026-11-13T15:57:48Z"
+   },
+   "at": null,
+   "lines": [],
+   "why": "a verdict that is not the text allow allowed nothing"
+  },
+  {
+   "name": "end_only_open",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-11-13T15:57:48Z"
+   },
+   "at": "2026-11-13T15:56:48Z",
+   "lines": [
+    "This decision allowed execution until 2026-11-13T15:57:48Z.",
+    "At 2026-11-13T15:56:48Z the window was open (until 2026-11-13T15:57:48Z; the record signs no start, so none was compared)."
+   ],
+   "why": "one bound: only the end is compared, and the line says so"
+  },
+  {
+   "name": "end_only_closed",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-11-13T15:57:48Z"
+   },
+   "at": "2026-11-13T15:57:48Z",
+   "lines": [
+    "This decision allowed execution until 2026-11-13T15:57:48Z.",
+    "At 2026-11-13T15:57:48Z the window was closed (it ended at 2026-11-13T15:57:48Z)."
+   ],
+   "why": "one bound, at its end"
+  },
+  {
+   "name": "order_exec_not_after_first",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "decided_at": "2026-11-13T15:56:48Z",
+    "exec_not_after": "2026-11-13T15:57:48Z",
+    "exp": "2026-11-13T16:01:38Z",
+    "not_after": "2026-11-13T15:58:48Z"
+   },
+   "at": null,
+   "lines": [
+    "This decision allowed execution until 2026-11-13T15:57:48Z.",
+    "No time was compared."
+   ],
+   "why": "exec_not_after before not_after; an exp the decision also carries is not read"
+  },
+  {
+   "name": "decision_exp_not_read",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "decided_at": "2026-11-13T15:56:48Z",
+    "exp": "2026-11-13T16:01:38Z",
+    "not_after": "2026-11-13T15:58:48Z"
+   },
+   "at": null,
+   "lines": [
+    "This decision allowed execution until 2026-11-13T15:58:48Z.",
+    "No time was compared."
+   ],
+   "why": "a decision's deadline is exec_not_after or not_after; exp is a statement's member and is not read"
+  },
+  {
+   "name": "order_not_after_last",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "decided_at": "2026-11-13T15:56:48Z",
+    "not_after": "2026-11-13T15:58:48Z"
+   },
+   "at": "2026-11-13T15:58:48Z",
+   "lines": [
+    "This decision allowed execution until 2026-11-13T15:58:48Z.",
+    "At 2026-11-13T15:58:48Z the window was closed (it ended at 2026-11-13T15:58:48Z)."
+   ],
+   "why": "an allow with not_after alone"
+  },
+  {
+   "name": "decision_nbf_not_read",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "nbf": "2026-11-13T15:56:38Z",
+    "decided_at": "2026-11-13T15:56:48Z",
+    "exec_not_after": "2026-11-13T15:57:48Z"
+   },
+   "at": "2026-11-13T15:56:40Z",
+   "lines": [
+    "This decision allowed execution until 2026-11-13T15:57:48Z.",
+    "At 2026-11-13T15:56:40Z the window was closed (it opened at 2026-11-13T15:56:48Z)."
+   ],
+   "why": "a decision's start is decided_at; nbf is a statement's member and is not read"
+  },
+  {
+   "name": "decision_exp_alone",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "decided_at": "2026-11-13T15:56:48Z",
+    "exp": "2026-11-13T16:01:38Z"
+   },
+   "at": null,
+   "lines": [],
+   "why": "an allow that signs neither exec_not_after nor not_after carries no deadline of its own"
+  },
+  {
+   "name": "decision_exp_alone_at",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "decided_at": "2026-11-13T15:56:48Z",
+    "exp": "2026-11-13T16:01:38Z"
+   },
+   "at": "2026-11-13T15:56:48Z",
+   "lines": [
+    "No time was compared: this record carries no execution window."
+   ],
+   "why": "a time was given and the allow carries no deadline of its own"
+  },
+  {
+   "name": "end_not_a_day",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "decided_at": "2026-11-13T15:56:48Z",
+    "exec_not_after": "2026-02-30T00:00:00Z"
+   },
+   "at": null,
+   "lines": [
+    "The signed exec_not_after is not a readable instant, so no deadline is reported.",
+    "No time was compared."
+   ],
+   "why": "30 February has the form and is no instant"
+  },
+  {
+   "name": "end_not_a_day_at",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "decided_at": "2026-11-13T15:56:48Z",
+    "exec_not_after": "2026-02-30T00:00:00Z"
+   },
+   "at": "2026-11-13T15:56:48Z",
+   "lines": [
+    "The signed exec_not_after is not a readable instant, so no deadline is reported.",
+    "No time was compared: the signed exec_not_after is not a readable instant."
+   ],
+   "why": "nothing is compared with a value that is no instant"
+  },
+  {
+   "name": "at_leap_day",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "decided_at": "2024-02-28T23:59:59Z",
+    "exec_not_after": "2024-03-01T00:00:00Z"
+   },
+   "at": "2024-02-29T00:00:00Z",
+   "lines": [
+    "This decision allowed execution until 2024-03-01T00:00:00Z.",
+    "At 2024-02-29T00:00:00Z the window was open (from 2024-02-28T23:59:59Z, until 2024-03-01T00:00:00Z)."
+   ],
+   "why": "29 February 2024 is an instant: 2024 is a leap year"
+  },
+  {
+   "name": "at_leap_day_last_second",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "decided_at": "2024-02-28T23:59:59Z",
+    "exec_not_after": "2024-03-01T00:00:00Z"
+   },
+   "at": "2024-02-29T23:59:59Z",
+   "lines": [
+    "This decision allowed execution until 2024-03-01T00:00:00Z.",
+    "At 2024-02-29T23:59:59Z the window was open (from 2024-02-28T23:59:59Z, until 2024-03-01T00:00:00Z)."
+   ],
+   "why": "the last second of a leap day"
+  },
+  {
+   "name": "at_leap_day_2000",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "decided_at": "2000-02-28T23:59:59Z",
+    "exec_not_after": "2000-03-01T00:00:00Z"
+   },
+   "at": "2000-02-29T12:00:00Z",
+   "lines": [
+    "This decision allowed execution until 2000-03-01T00:00:00Z.",
+    "At 2000-02-29T12:00:00Z the window was open (from 2000-02-28T23:59:59Z, until 2000-03-01T00:00:00Z)."
+   ],
+   "why": "a year divisible by 400 is a leap year"
+  },
+  {
+   "name": "at_month_last_second",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "decided_at": "2026-04-30T00:00:00Z",
+    "exec_not_after": "2026-05-01T00:00:00Z"
+   },
+   "at": "2026-04-30T23:59:59Z",
+   "lines": [
+    "This decision allowed execution until 2026-05-01T00:00:00Z.",
+    "At 2026-04-30T23:59:59Z the window was open (from 2026-04-30T00:00:00Z, until 2026-05-01T00:00:00Z)."
+   ],
+   "why": "the last second of a 30-day month"
+  },
+  {
+   "name": "at_year_last_second",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "decided_at": "2026-12-31T00:00:00Z",
+    "exec_not_after": "2027-01-01T00:00:00Z"
+   },
+   "at": "2026-12-31T23:59:59Z",
+   "lines": [
+    "This decision allowed execution until 2027-01-01T00:00:00Z.",
+    "At 2026-12-31T23:59:59Z the window was open (from 2026-12-31T00:00:00Z, until 2027-01-01T00:00:00Z)."
+   ],
+   "why": "the last second of a year"
+  },
+  {
+   "name": "at_year_first_second",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "decided_at": "2026-12-31T00:00:00Z",
+    "exec_not_after": "2027-01-01T00:00:00Z"
+   },
+   "at": "2027-01-01T00:00:00Z",
+   "lines": [
+    "This decision allowed execution until 2027-01-01T00:00:00Z.",
+    "At 2027-01-01T00:00:00Z the window was closed (it ended at 2027-01-01T00:00:00Z)."
+   ],
+   "why": "the first second of the next year is the end, and the end is outside the window"
+  },
+  {
+   "name": "end_last_day_january",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-01-31T23:59:59Z"
+   },
+   "at": null,
+   "lines": [
+    "This decision allowed execution until 2026-01-31T23:59:59Z.",
+    "No time was compared."
+   ],
+   "why": "the last second of the last day of month 01"
+  },
+  {
+   "name": "end_last_day_march",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-03-31T23:59:59Z"
+   },
+   "at": null,
+   "lines": [
+    "This decision allowed execution until 2026-03-31T23:59:59Z.",
+    "No time was compared."
+   ],
+   "why": "the last second of the last day of month 03"
+  },
+  {
+   "name": "end_last_day_april",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-04-30T23:59:59Z"
+   },
+   "at": null,
+   "lines": [
+    "This decision allowed execution until 2026-04-30T23:59:59Z.",
+    "No time was compared."
+   ],
+   "why": "the last second of the last day of month 04"
+  },
+  {
+   "name": "end_last_day_may",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-05-31T23:59:59Z"
+   },
+   "at": null,
+   "lines": [
+    "This decision allowed execution until 2026-05-31T23:59:59Z.",
+    "No time was compared."
+   ],
+   "why": "the last second of the last day of month 05"
+  },
+  {
+   "name": "end_last_day_june",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-06-30T23:59:59Z"
+   },
+   "at": null,
+   "lines": [
+    "This decision allowed execution until 2026-06-30T23:59:59Z.",
+    "No time was compared."
+   ],
+   "why": "the last second of the last day of month 06"
+  },
+  {
+   "name": "end_last_day_july",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-07-31T23:59:59Z"
+   },
+   "at": null,
+   "lines": [
+    "This decision allowed execution until 2026-07-31T23:59:59Z.",
+    "No time was compared."
+   ],
+   "why": "the last second of the last day of month 07"
+  },
+  {
+   "name": "end_last_day_august",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-08-31T23:59:59Z"
+   },
+   "at": null,
+   "lines": [
+    "This decision allowed execution until 2026-08-31T23:59:59Z.",
+    "No time was compared."
+   ],
+   "why": "the last second of the last day of month 08"
+  },
+  {
+   "name": "end_last_day_september",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-09-30T23:59:59Z"
+   },
+   "at": null,
+   "lines": [
+    "This decision allowed execution until 2026-09-30T23:59:59Z.",
+    "No time was compared."
+   ],
+   "why": "the last second of the last day of month 09"
+  },
+  {
+   "name": "end_last_day_october",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-10-31T23:59:59Z"
+   },
+   "at": null,
+   "lines": [
+    "This decision allowed execution until 2026-10-31T23:59:59Z.",
+    "No time was compared."
+   ],
+   "why": "the last second of the last day of month 10"
+  },
+  {
+   "name": "end_last_day_november",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-11-30T23:59:59Z"
+   },
+   "at": null,
+   "lines": [
+    "This decision allowed execution until 2026-11-30T23:59:59Z.",
+    "No time was compared."
+   ],
+   "why": "the last second of the last day of month 11"
+  },
+  {
+   "name": "end_last_day_december",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-12-31T23:59:59Z"
+   },
+   "at": null,
+   "lines": [
+    "This decision allowed execution until 2026-12-31T23:59:59Z.",
+    "No time was compared."
+   ],
+   "why": "the last second of the last day of month 12"
+  },
+  {
+   "name": "end_28_february",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-02-28T23:59:59Z"
+   },
+   "at": null,
+   "lines": [
+    "This decision allowed execution until 2026-02-28T23:59:59Z.",
+    "No time was compared."
+   ],
+   "why": "the last second of February in a year that is no leap year"
+  },
+  {
+   "name": "end_leap_day",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2024-02-29T23:59:59Z"
+   },
+   "at": null,
+   "lines": [
+    "This decision allowed execution until 2024-02-29T23:59:59Z.",
+    "No time was compared."
+   ],
+   "why": "29 February of a leap year is a day"
+  },
+  {
+   "name": "end_leap_day_2000",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2000-02-29T00:00:00Z"
+   },
+   "at": null,
+   "lines": [
+    "This decision allowed execution until 2000-02-29T00:00:00Z.",
+    "No time was compared."
+   ],
+   "why": "2000 is divisible by 400: a leap year"
+  },
+  {
+   "name": "end_29_february_2026",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-02-29T00:00:00Z"
+   },
+   "at": null,
+   "lines": [
+    "The signed exec_not_after is not a readable instant, so no deadline is reported.",
+    "No time was compared."
+   ],
+   "why": "2026 is no leap year"
+  },
+  {
+   "name": "end_29_february_2100",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2100-02-29T00:00:00Z"
+   },
+   "at": null,
+   "lines": [
+    "The signed exec_not_after is not a readable instant, so no deadline is reported.",
+    "No time was compared."
+   ],
+   "why": "2100 is divisible by 100 and not by 400: no leap year"
+  },
+  {
+   "name": "end_31_april",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-04-31T00:00:00Z"
+   },
+   "at": null,
+   "lines": [
+    "The signed exec_not_after is not a readable instant, so no deadline is reported.",
+    "No time was compared."
+   ],
+   "why": "month 04 has 30 days"
+  },
+  {
+   "name": "end_31_june",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-06-31T00:00:00Z"
+   },
+   "at": null,
+   "lines": [
+    "The signed exec_not_after is not a readable instant, so no deadline is reported.",
+    "No time was compared."
+   ],
+   "why": "month 06 has 30 days"
+  },
+  {
+   "name": "end_31_september",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-09-31T00:00:00Z"
+   },
+   "at": null,
+   "lines": [
+    "The signed exec_not_after is not a readable instant, so no deadline is reported.",
+    "No time was compared."
+   ],
+   "why": "month 09 has 30 days"
+  },
+  {
+   "name": "end_31_november",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-11-31T00:00:00Z"
+   },
+   "at": null,
+   "lines": [
+    "The signed exec_not_after is not a readable instant, so no deadline is reported.",
+    "No time was compared."
+   ],
+   "why": "month 11 has 30 days"
+  },
+  {
+   "name": "end_minute_60",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-11-13T15:60:00Z"
+   },
+   "at": null,
+   "lines": [
+    "The signed exec_not_after is not a readable instant, so no deadline is reported.",
+    "No time was compared."
+   ],
+   "why": "a minute is 00 to 59"
+  },
+  {
+   "name": "end_day_00",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-11-00T00:00:00Z"
+   },
+   "at": null,
+   "lines": [
+    "The signed exec_not_after is not a readable instant, so no deadline is reported.",
+    "No time was compared."
+   ],
+   "why": "a day is 01 or later"
+  },
+  {
+   "name": "end_month_00",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-00-13T00:00:00Z"
+   },
+   "at": null,
+   "lines": [
+    "The signed exec_not_after is not a readable instant, so no deadline is reported.",
+    "No time was compared."
+   ],
+   "why": "a month is 01 to 12"
+  },
+  {
+   "name": "end_month_13",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-13-01T00:00:00Z"
+   },
+   "at": null,
+   "lines": [
+    "The signed exec_not_after is not a readable instant, so no deadline is reported.",
+    "No time was compared."
+   ],
+   "why": "a month is 01 to 12"
+  },
+  {
+   "name": "end_null_is_present",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": null,
+    "not_after": "2026-11-13T15:58:48Z"
+   },
+   "at": null,
+   "lines": [
+    "The signed exec_not_after is not a readable instant, so no deadline is reported.",
+    "No time was compared."
+   ],
+   "why": "the first member PRESENT decides; a null exec_not_after does not fall through to not_after"
+  },
+  {
+   "name": "end_a_number",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": 1794585468
+   },
+   "at": null,
+   "lines": [
+    "The signed exec_not_after is not a readable instant, so no deadline is reported.",
+    "No time was compared."
+   ],
+   "why": "a number is not an instant; nothing is converted"
+  },
+  {
+   "name": "end_with_offset",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-11-13T15:57:48+00:00"
+   },
+   "at": null,
+   "lines": [
+    "The signed exec_not_after is not a readable instant, so no deadline is reported.",
+    "No time was compared."
+   ],
+   "why": "one spelling is accepted"
+  },
+  {
+   "name": "end_with_fraction",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "exec_not_after": "2026-11-13T15:57:48.000Z"
+   },
+   "at": null,
+   "lines": [
+    "The signed exec_not_after is not a readable instant, so no deadline is reported.",
+    "No time was compared."
+   ],
+   "why": "one spelling is accepted"
+  },
+  {
+   "name": "start_unreadable_no_time",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "decided_at": "2026-11-13 15:56:48",
+    "exec_not_after": "2026-11-13T15:57:48Z"
+   },
+   "at": null,
+   "lines": [
+    "This decision allowed execution until 2026-11-13T15:57:48Z.",
+    "No time was compared."
+   ],
+   "why": "the deadline is readable; the start is not looked at without a time"
+  },
+  {
+   "name": "start_unreadable_at",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "decided_at": "2026-11-13 15:56:48",
+    "exec_not_after": "2026-11-13T15:57:48Z"
+   },
+   "at": "2026-11-13T15:56:48Z",
+   "lines": [
+    "This decision allowed execution until 2026-11-13T15:57:48Z.",
+    "No time was compared: the signed decided_at is not a readable instant."
+   ],
+   "why": "a start that is present and unreadable: nothing is compared"
+  },
+  {
+   "name": "start_after_end_between",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "decided_at": "2026-11-13T15:57:48Z",
+    "exec_not_after": "2026-11-13T15:56:48Z"
+   },
+   "at": "2026-11-13T15:57:00Z",
+   "lines": [
+    "This decision allowed execution until 2026-11-13T15:56:48Z.",
+    "At 2026-11-13T15:57:00Z the window was closed (it opened at 2026-11-13T15:57:48Z)."
+   ],
+   "why": "a start after the end: never open; the start is compared first"
+  },
+  {
+   "name": "start_after_end_later",
+   "kind": "decision",
+   "metadata": {
+    "verdict": "allow",
+    "decided_at": "2026-11-13T15:57:48Z",
+    "exec_not_after": "2026-11-13T15:56:48Z"
+   },
+   "at": "2026-11-13T15:58:48Z",
+   "lines": [
+    "This decision allowed execution until 2026-11-13T15:56:48Z.",
+    "At 2026-11-13T15:58:48Z the window was closed (it ended at 2026-11-13T15:56:48Z)."
+   ],
+   "why": "a start after the end: never open"
+  }
+ ],
+ "malformed_at": [
+  "",
+  "2026-11-13T15:57:48+00:00",
+  "2026-11-13T15:57:48.000Z",
+  "2026-11-13t15:57:48z",
+  "2026-11-13 15:57:48Z",
+  "2026-02-30T00:00:00Z",
+  "2026-11-13T24:00:00Z",
+  "2026-11-13T15:57:60Z",
+  "1794585468",
+  "2026-11-13T15:57:48Z\n",
+  " 2026-11-13T15:57:48Z",
+  "now",
+  "2026-02-29T00:00:00Z",
+  "2100-02-29T00:00:00Z",
+  "2026-04-31T00:00:00Z",
+  "2026-06-31T00:00:00Z",
+  "2026-09-31T00:00:00Z",
+  "2026-11-31T00:00:00Z",
+  "2026-01-32T00:00:00Z",
+  "2026-11-13T15:60:00Z",
+  "2026-11-00T00:00:00Z",
+  "2026-00-13T00:00:00Z",
+  "2026-13-01T00:00:00Z"
+ ],
+ "unknown_arguments": [
+  {
+   "argv": [
+    "--att",
+    "2026-11-13T15:57:00Z"
+   ],
+   "why": "a flag one letter longer than --at"
+  },
+  {
+   "argv": [
+    "--AT",
+    "2026-11-13T15:57:00Z"
+   ],
+   "why": "a flag is matched in the case it is written in"
+  },
+  {
+   "argv": [
+    "--time",
+    "2026-11-13T15:57:00Z"
+   ],
+   "why": "a flag no verifier takes"
+  },
+  {
+   "argv": [
+    "-at",
+    "2026-11-13T15:57:00Z"
+   ],
+   "why": "one dash"
+  },
+  {
+   "argv": [
+    "2026-11-13T15:57:00Z"
+   ],
+   "why": "a value with no flag before it"
+  },
+  {
+   "argv": [
+    "--at",
+    "2026-11-13T15:57:00Z",
+    "--verbose"
+   ],
+   "why": "an unknown flag after a known one"
+  }
+ ],
+ "unknown_options": [
+  "att",
+  "AT",
+  "time",
+  "At",
+  "atTime"
+ ]
+}

@@ -10,7 +10,7 @@ environment says of the record. The log, its checkpoints and its witnesses exist
         --lab-verify /path/to/bin/lab-verify --registry LAB-KEYS.json \
         --checkpoint NOTE --inclusion-proof PROOF.json --witness-policy POLICY \
         [--held-size N --held-root ROOT | --held-state FILE [--write-held-state]] \
-        [--consistency-proof PROOF.json] [--key-transition RECORD.json]
+        [--consistency-proof PROOF.json] [--key-transition RECORD.json [--held-to-transition-proof PROOF.json]]
 
 The flags are handed, as given, to `bin/lab-verify`, which hands them to Requisition's receipt verifier
 `verify_receipt.py`. That file does the checks. Its `CHECKPOINTS.md` (beside it, in
@@ -21,6 +21,17 @@ not checked. In short:
    that the log key your policy names signed and that the witnesses it names cosigned, meeting its quorum;
 2. a checkpoint larger than the tree size you hold is consistent with your tree (an RFC 9162 consistency proof);
 3. a checkpoint smaller than the tree size you hold, or of that size with another root, is refused.
+
+After a key change of the evaluation environment's log (`--key-transition`), when the tree size you hold is below the
+point at which the old key endorsed the new one, two consistency proofs are needed in the evaluation environment:
+`--held-to-transition-proof`, from your tree to the endorsed tree, and `--consistency-proof`, from the endorsed tree to
+the evaluation environment's checkpoint. Without the first the evaluation environment's checkpoint is refused,
+`checkpoint_consistency_unproven`: the endorsement alone does not show that the endorsed tree extends yours. When the
+tree size you hold is that point, the endorsed root must be your root (else `checkpoint_split_view_at_held_size`). When
+the evaluation environment's checkpoint is larger than that point and the tree size you hold is above it, or nothing is
+held, the root the evaluation environment's key change names for that point is not checked: the checkpoint is compared
+with your tree alone, or with none. A checkpoint of the evaluation environment at that point must carry that root,
+whatever you hold.
 
 A pass shows that the record is in the log's tree at the checkpoint's size, and that this tree is an append-only
 extension of the tree you hold. It does not show that the checkpoint is the log's newest, nor that the act ran, or

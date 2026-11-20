@@ -2,7 +2,7 @@
 
 This repository holds two signed records of one approval, a statement and a decision, and the program that verifies them. Anyone can run the verification on their own machine, offline, with one command.
 
-The records come from a run on 13 November 2026 in Requisition's evaluation environment, in which an AI agent asked to send a refund. [Requisition](#about-requisition), an authority of record for agent actions, held the request until it was approved by two separate accounts, then signed its decision.
+The records come from a run on 13 November 2026 in Requisition's evaluation environment, in which an AI agent asked to send a refund. [Requisition](#about-requisition), an authority of record for agent actions, held the request until it was approved by two separate accounts, then signed its decision. Both approver accounts were operated by one person in this run, as the signed `hands` label of each record states: `"hands": "one-person (G-301)"`.
 
 Each of the two records carries two signatures over the same bytes, both made inside AWS KMS keys of the evaluation environment: Ed25519 (RFC 8032) and ML-DSA-87 (FIPS 204), a post-quantum signature standard.
 
@@ -61,7 +61,39 @@ sha256sum -c SHA256SUMS
 sh verify.sh
 ```
 
-Two companion packages, `requisition-aws` for Python and `requisition-ts` for TypeScript, are prepared for PyPI and npm. They are not published yet. Neither is needed to run this verifier.
+Three companion packages are published. None of them is needed to run this verifier.
+
+| package | version | registry page | what it is |
+|---|---|---|---|
+| `requisition-aws` | 0.1.0 | PyPI: <https://pypi.org/project/requisition-aws/0.1.0/> | Python adapters for Requisition's evaluation environment and an offline check of its records |
+| `requisition-ts` | 0.1.0 | npm: <https://www.npmjs.com/package/requisition-ts/v/0.1.0> | a TypeScript SDK and an MCP proxy for the same environment |
+| `requisition_receipt_verifier` | 0.1.0 | Hex: <https://hex.pm/packages/requisition_receipt_verifier/0.1.0> | the Elixir receipt verifier, built from [`elixir/`](elixir/README.md) of this repository |
+
+A registry page is not an anchor by itself. Compare what you download with the values below: they are in this repository, whose release tags are signed (see [Signed releases](PROVENANCE.md#signed-releases)).
+
+**PyPI, by the file's SHA-256.** Download without installing, then compute the digest:
+
+```
+python3 -m pip download --no-deps requisition-aws==0.1.0
+sha256sum requisition_aws-0.1.0-py3-none-any.whl
+```
+
+| file | SHA-256 |
+|---|---|
+| `requisition_aws-0.1.0-py3-none-any.whl` | `338d935a09b2776a089dfa3aaeb883eea29041bda529a6a58662d097cba696b3` |
+| `requisition_aws-0.1.0.tar.gz` | `b0780f4ce034e195312df42af83db84e3152d5aff62728a3797ad3e9f67a51f5` |
+
+To make pip refuse any other file, install with `python3 -m pip install --require-hashes -r requirements.txt`, where `requirements.txt` gives `--hash=sha256:<digest>` for this package and for each of its dependencies.
+
+**npm, by the registry's `integrity` value.** npm compares the package file it downloads (the tarball) with that value, and a `package-lock.json` keeps it.
+
+```
+npm view requisition-ts@0.1.0 dist.integrity
+```
+
+Expected: `sha512-H+5Hsy2HvRnRaVI55vQdAT4RLFn4I1c9fX+Qzl20aKqV8MGiurVCeBaJ8cacVsV9ztwp7PyxhonJlu7EfWg7cA==`. To compute it from the file: `npm pack requisition-ts@0.1.0`, then `openssl dgst -sha512 -binary requisition-ts-0.1.0.tgz | openssl base64 -A` prints the part after `sha512-`. The SHA-256 of that file is `9215d8db2f0539df7423ce69ffa539519f6566b927dc2a24cd409ff86080389c`.
+
+**Hex, by the checksum in `mix.lock` and the signed tag.** After `mix deps.get`, the last value of the package's entry in `mix.lock` is the SHA-256 of the downloaded package file, and Mix refuses a later download that does not match it. Expected: `87606c42b077d7b7305742fb58a72e5251b4b89e61a7471d560cd8f8536fb226`. `mix hex.package fetch requisition_receipt_verifier 0.1.0` downloads the same file without adding a dependency, for `sha256sum`. Each of the 11 files inside the package is, byte for byte, the file of the same name under `elixir/` at this repository's signed tag `v0.2.0`.
 
 ## What happened in the run
 
@@ -107,7 +139,7 @@ A refused checkpoint of the evaluation environment is named by its code, and `ve
 
 Each check of the evaluation environment's log, each input, every refusal code and what is not checked are stated in [`verifier/CHECKPOINTS.md`](verifier/CHECKPOINTS.md); what `verify_offline.py` adds to them is in [`CHECKPOINTS.md`](CHECKPOINTS.md). Both are unchanged copies from their source trees, so they name paths there; [`PROVENANCE.md`](PROVENANCE.md) maps those paths to this repository and states what differs.
 
-To run the check on inputs made by the evaluation environment's own code, run `sh checkpoint-test.sh`. It runs `verify_offline.py` with these flags over the 32 cases in [`checkpoint-vectors/`](checkpoint-vectors/manifest.json) and compares each answer with the one the case's manifest entry expects: 6 cases pass and 26 are refused, each by its code. The last line is `RESULT: PASS (32 cases: 6 pass, 26 refused by name, each as expected)`. The vectors were made in a test run of the evaluation environment, under a development key and with test witnesses; they are not the 13 November records, and their key is not one of the AWS KMS keys of the evaluation environment named below. Each negative case changes the producer's bytes in one stated way. [`PROVENANCE.md`](PROVENANCE.md) says where they come from.
+To run the check on inputs made by the evaluation environment's own code, run `sh checkpoint-test.sh`. It runs `verify_offline.py` with these flags over the 39 cases in [`checkpoint-vectors/`](checkpoint-vectors/manifest.json) and compares each answer with the one the case's manifest entry expects: 6 cases pass and 33 are refused, each by its code. It then gives the check 138 inputs of another form, made from four passing cases: each JSON file flag given a file that holds a bare JSON value (`false`, `null`, `0`, `""`, `[]` and four more); a proof's `hash`, its `leaf_hash`, the record's `cosignature` or the `signature` of a cosignature object written as `null`, `false`, `true`, `0`, `""`, `[]` or `{}`, or left out; and a co-signature beside the record (`--cosignature`, or the member beside the record in an answer) holding a bare JSON value, with and without the checkpoint flags of the evaluation environment. Each is refused (a held-state file of that form is a usage error), except a member left out and the empty text as the co-signature member, which pass. The last line is `RESULT: PASS (39 cases: 6 pass, 33 refused by name, each as expected; 17 runs with a held-state file; 138 runs with an input of another form, each as expected)`. The vectors were made in a test run of the evaluation environment, under a development key and with test witnesses; they are not the 13 November records, and their key is not one of the AWS KMS keys of the evaluation environment named below. Each negative case changes the producer's bytes in one stated way. [`PROVENANCE.md`](PROVENANCE.md) says where they come from.
 
 ### About `DEGRADED (lab)` in the output
 
@@ -121,12 +153,19 @@ A pass proves that:
 - the Ed25519 signature and the ML-DSA-87 signature on each record are valid, over the same bytes, under the two public keys in `record/public-keys.json` that the key file marks as AWS KMS keys of the evaluation environment;
 - the records have not changed since they were signed.
 
+Every pass prints this sentence after the verdict:
+
+> A pass shows these bytes were signed under the key you supplied. It is not permission to act. Whether an action may run is decided by the issuing system when it runs.
+
+An expired decision is still a valid record. The verifier reports the deadline a record signs as history, with the time as the record signs it: `This decision allowed execution until <time>.` for a decision that allowed, and `This statement was valid until <time>.` for a statement. A record that is neither has no such line. It compares no time unless you give one: `--at YYYY-MM-DDTHH:MM:SSZ` adds one line saying whether the signed window was open or closed at that instant. The exit status never depends on it. An argument a verifier does not take is a usage error (exit status 2), never skipped: a mistyped `--at` cannot pass in silence. The same record presented twice passes twice, with the same lines: refusing a second use is the work of the issuing system, not of a verifier. To run these cases on the two records here, run `sh pass-test.sh`; its last line is `RESULT: PASS (every case as expected)`. The rule and every line a pass can end with are stated in [`elixir/VERDICTS.md`](elixir/VERDICTS.md), section "What a pass says".
+
 A pass does not prove the following, and this repository does not claim it.
 
 - **The keys are evaluation keys, not a trust root.** Each entry of the key file is marked `"profile": "lab"`. You are trusting this repository to give you the right key file. A production deployment anchors its keys in a trust root that the relying party controls; that is not shown here.
 - **Key custody is asserted, not verified.** The key file says the two private keys, keys of the evaluation environment, are held in AWS KMS and cannot be exported. An offline check cannot confirm where a private key lives.
+- **The two approvals were not made by two independent persons.** Both approver accounts were operated by one person in this run. The signed bytes of each record say so, in the `hands` label quoted in the second paragraph of this page. What the run shows is that the action was held until two distinct approver accounts had approved it.
 - **Nothing proves the action was carried out.** The records are a statement and a decision. A pass says nothing about what happened after the decision.
-- **Signed times are not compared with the current time.** The statement carries `occurred_at`, `iat`, `nbf` and `exp`; the decision carries `occurred_at`, `decided_at`, `not_after` and `exec_not_after`. The verifier checks that each key was valid at the record's signed `occurred_at`; it does not check whether a record has since expired. These are historical records.
+- **Signed times are not compared with the current time.** The statement carries `occurred_at`, `iat`, `nbf` and `exp`; the decision carries `occurred_at`, `decided_at`, `not_after` and `exec_not_after`. The verifier checks that each key was valid at the record's signed `occurred_at`; it does not check whether a record has since expired, and a time given with `--at` is reported and never changes the verdict. These are historical records.
 - **One record is judged at a time.** A pass says nothing about other records of the same environment: whether a later record exists, or whether a record was withheld.
 - **The server is not public.** You can verify the signed output of the run. You cannot reproduce the run.
 
@@ -163,7 +202,7 @@ Fields in the signed payload that a reader may ask about:
 | `metadata.verdict` | The decision: `allow` |
 | `metadata.statement_id` (decision) | The `receipt_hash` of the statement this decision follows |
 | `metadata.kms_key_arn`, `metadata.cosign` | The AWS KMS keys of the evaluation environment that the record says signed it |
-| `metadata.hands` | The hands label, signed as `one-person (G-301)` |
+| `metadata.hands` | The hands label; its signed value is quoted in the second paragraph of this page |
 | `metadata.profile` | `lab`: the evaluation key profile |
 | `sequence`, `previous_hash` | Position in the environment's append-only record chain. The statement's `previous_hash` points to an earlier record that is not published here; the decision's points to the statement |
 | `metadata.principal`, `caller_id`, `grant_id`, `request_id`, `chain_scope` | Identifiers internal to the evaluation environment |
@@ -174,6 +213,7 @@ Fields in the signed payload that a reader may ask about:
 verify.sh              the one command
 tamper-test.sh         negative tests
 checkpoint-test.sh     check 4 over the evaluation environment's checkpoint vectors
+pass-test.sh           what a pass says: the fixed sentence, the signed deadline, a time given with --at
 expected-output.txt    the output of verify.sh
 record/
   arguments.json       the arguments of the action
@@ -187,7 +227,7 @@ verifier/
   CHECKPOINTS.md       check 4: each check, input and refusal, and what is not checked
   vendor/mldsa.py      third-party ML-DSA (FIPS 204) verification, unmodified
 CHECKPOINTS.md         check 4: what verify_offline.py adds
-checkpoint-vectors/    32 cases for check 4: records, checkpoints, proofs, policies, and the manifest
+checkpoint-vectors/    39 cases for check 4: records, checkpoints, proofs, policies, and the manifest
 interop/
   README.md            what was measured with nine ML-DSA-87 verifiers, and what it does not show
   cases.tsv            260 cases built from the record and two sets of test vectors
@@ -198,6 +238,8 @@ interop/
 elixir/                the Elixir receipt verifier, verify_receipt.exs, as the source of a Hex package
 tools/
   check-licence.py     checks the licence, the NOTICE, the source headers and the interop download pins
+  check-stands-alone.py  checks that no file points at a private source tree, at one machine or at internal workflow,
+                       and that the page says who operated the approver accounts, as the record's signed label does
 PROVENANCE.md          where every file came from, with digests
 SHA256SUMS             SHA-256 of every file
 LICENSE                Apache License 2.0
@@ -220,6 +262,10 @@ Requisition is an authority of record for what AI agents and other automated act
 An approval record for a consequential action may need to be relied on for many years. A record whose signature could be forged later is a record that could be rewritten later. That is the reason for the second, post-quantum signature on the records here, which Requisition adds in its evaluation environment.
 
 The Requisition server is not open source. This verifier and these records are published so that the verification can be checked independently.
+
+## Correction (2026-11-19)
+
+The message of the tag `v0.1.0`, and the title of this page at that tag, said "two-person approval". The record does not show that. It shows two approver accounts, and one person operated both of them in this run; the signed bytes of each record say so: `"hands": "one-person (G-301)"`. The page at `v0.1.0` said this among the things a pass does not prove. The page at `v0.2.0` left that statement out; this page states it in its second paragraph and again among the things a pass does not prove. The published tags are not changed.
 
 ## Licence
 

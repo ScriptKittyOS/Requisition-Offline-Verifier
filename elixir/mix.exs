@@ -1,5 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
+# The crypto application is loaded here, when Mix reads this file, before Mix itself loads the crypto module on the
+# way to a task of this project. On an Erlang build whose crypto module warns when it is loaded before its
+# application, the runtime would otherwise write that warning to standard output ahead of the verdict of
+# `mix requisition_receipt_verifier.verify` (the script and the command load it first for the same reason).
+# Loading it starts nothing and reads no input.
+:application.load(:crypto)
+
 defmodule RequisitionReceiptVerifier.MixProject do
   use Mix.Project
 

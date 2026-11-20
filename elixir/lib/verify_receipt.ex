@@ -1,18 +1,27 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
-# Derived by scripts/derive.exs from verify_receipt.exs, sha256 d8b618dc6fadd7557981fd62e7e3520708b741085ff9cc6c1569b8fb5f4fdbe0.
+# Derived by scripts/derive.exs from verify_receipt.exs, sha256 145e062865809dc88ab616629022e0579dbc32d04efc93c8700707dcf72d4800.
 #
 # verify_receipt.exs — check a Trinity authority receipt's Ed25519 signature.
 #
-#   elixir verify_receipt.exs --receipt RECEIPT.json --registry REGISTRY.json
+#   elixir verify_receipt.exs --receipt RECEIPT.json --registry REGISTRY.json [--at TIME]
 #       [--checkpoint NOTE --inclusion-proof PROOF.json --witness-policy POLICY
 #        [--held-size N --held-root ROOT | --held-state FILE [--write-held-state]]
-#        [--consistency-proof PROOF.json] [--key-transition RECORD.json]]
+#        [--consistency-proof PROOF.json] [--key-transition RECORD.json [--held-to-transition-proof PROOF.json]]]
 #
 # LOG CHECKPOINTS. With --checkpoint, a receipt that VERIFIED is also checked against a checkpoint of the
 # evaluation environment's transparency log (the module RequisitionReceiptVerifier.LogCheckpoint in verify_receipt_checkpoint.exs,
 # beside this file, loaded only then; CHECKPOINTS.md states the checks, the inputs, every refusal and
 # what is not checked).
+#
+# WHAT A PASS SAYS. Every exit 0 prints, after its verdict, one fixed sentence (@pass_line): a pass shows
+# the bytes were signed under the key supplied, and it is not permission to act. A deadline the signed
+# bytes carry is reported after it as what the record says, for a decision that allowed (the signed
+# verdict is "allow") and for a statement (a statement record with no signed verdict, and exp), each in its own words, and for no
+# other record; it is compared with nothing unless --at TIME is given (one instant, YYYY-MM-DDTHH:MM:SSZ;
+# any other value is a usage error, exit 2), and then the line says whether the record's window was open
+# at that instant. No exit depends on a time: an expired decision is still a valid record. VERDICTS.md
+# ("What a pass says") states the rule and its rows.
 #
 # No Mix project, no hex packages, no network. Requires Elixir 1.17 / OTP 27 or later for the
 # built-in `:json` module; verified on Elixir 1.19.2 / OTP 28.
@@ -38,6 +47,11 @@
 # README.md so it can be reimplemented from scratch, and a second independent implementation ships
 # beside it (verify_receipt.py, Python standard library only). Two implementations agreeing is a
 # stronger basis than either alone. They share NO code, on purpose.
+
+# The crypto application is loaded here, before the first module below is compiled. On an Erlang build whose
+# crypto module warns when it is loaded before its application, the runtime would otherwise write that warning
+# to standard output ahead of this verifier's first line. Loading it starts nothing and reads no input.
+# (packaged: RequisitionReceiptVerifier.CLI.main/1 loads the crypto application; nothing runs here)
 
 # BEGIN ed25519-strict
 # The Ed25519 refusals this verifier makes BEFORE it hands the signature to OTP. OTP's
@@ -186,25 +200,37 @@ defmodule RequisitionReceiptVerifier.VerifyReceipt do
 
   @statuses ~w(example active retired compromised)
   # RequisitionReceiptVerifier.LogCheckpoint.flags/0's list (verify_receipt_checkpoint.exs), which a test compares with this one
-  @checkpoint_flags ~w(--checkpoint --inclusion-proof --witness-policy --held-size --held-root --consistency-proof --key-transition --held-state)
+  @checkpoint_flags ~w(--checkpoint --inclusion-proof --witness-policy --held-size --held-root --consistency-proof --key-transition --held-state --held-to-transition-proof)
   @envelope ~w(signature key_id signed_payload receipt_hash)
-  @ignored ~w(public_key _note)
+  @ignored ~w(public_key)
   @timestamp ~r/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/
+
+  # WHAT A PASS SAYS (VERDICTS.md, the section of that name; verify_receipt.py's PASS_LINE, WINDOW_DECISION and
+  # WINDOW_STATEMENT). The sentence every exit 0 prints after its verdict, and the two kinds of record a
+  # deadline is reported for, each as {the sentence its deadline is reported in, the signed metadata members
+  # read as its end, the members read as its start}: the end is the first of its list that is present, the start
+  # likewise.
+  @pass_line "A pass shows these bytes were signed under the key you supplied. It is not permission to act. Whether an action may run is decided by the issuing system when it runs."
+  @window_decision {"This decision allowed execution until ", ~w(exec_not_after not_after), ~w(decided_at)}
+  @window_statement {"This statement was valid until ", ~w(exp), ~w(nbf)}
+  # the signed receipt_type of a statement record, the only kind whose exp is reported
+  @window_statement_type "requisition.lab.statement.v0"
 
   def main(argv) do
     case parse(argv, %{}) do
       {:ok, opts} -> run(opts)
       {:error, message} -> fail(@exit_usage, message)
+      {:unknown, left} -> fail(@exit_usage, "usage: argument #{length(argv) - left} is not one this verifier takes")
       {:no_registry} -> fail(@exit_no_trust, :no_registry)
     end
   end
 
   # Scanned explicitly rather than chunked, so `--receipt` with no value after it is a USAGE error
   # and never a silently dropped flag that changes the verdict.
-  defp parse([flag], _opts) when flag in ["--receipt", "--registry"],
+  defp parse([flag], _opts) when flag in ["--receipt", "--registry", "--at"],
     do: {:error, "usage: #{flag} requires a value"}
 
-  defp parse([flag, value | rest], opts) when flag in ["--receipt", "--registry"],
+  defp parse([flag, value | rest], opts) when flag in ["--receipt", "--registry", "--at"],
     do: parse(rest, Map.put(opts, flag, value))
 
   # the log checkpoint's flags (CHECKPOINTS.md): each takes a value, but --write-held-state
@@ -216,12 +242,18 @@ defmodule RequisitionReceiptVerifier.VerifyReceipt do
   defp parse([flag, value | rest], opts) when flag in @checkpoint_flags,
     do: parse(rest, Map.put(opts, flag, value))
 
-  defp parse([_ignored | rest], opts), do: parse(rest, opts)
+  # An argument this verifier does not take is refused, never skipped: a skipped "--att TIME" would be a pass with
+  # no comparison where the caller asked for one, in silence. The argument is not echoed; `left` counts what follows.
+  defp parse([_unknown | rest], _opts), do: {:unknown, length(rest)}
 
   defp parse([], opts) do
     cond do
       is_nil(opts["--receipt"]) ->
         {:error, "usage: verify_receipt.exs --receipt RECEIPT.json --registry REGISTRY.json"}
+
+      # WHAT A PASS SAYS: the time is judged as an argument, before anything is read. It changes no verdict.
+      Map.has_key?(opts, "--at") and is_nil(timestamp(opts["--at"])) ->
+        {:error, "usage: --at takes one instant of the form YYYY-MM-DDTHH:MM:SSZ"}
 
       # DEFAULT DISTRUST. Absent an independently supplied registry there is no basis to judge the
       # receipt, and inventing one from the bundle is the failure this scheme exists to remove.
@@ -249,7 +281,7 @@ defmodule RequisitionReceiptVerifier.VerifyReceipt do
           end
         end
 
-      verify(receipt, registry, checkpoint)
+      verify(receipt, registry, checkpoint, opts["--at"])
     else
       {:error, message} -> fail(@exit_usage, message)
     end
@@ -267,7 +299,7 @@ defmodule RequisitionReceiptVerifier.VerifyReceipt do
     end
   end
 
-  defp verify(receipt, registry, checkpoint) when is_map(receipt) do
+  defp verify(receipt, registry, checkpoint, at) when is_map(receipt) do
     payload = member(receipt, "signed_payload")
     signature = member(receipt, "signature")
     key_id = member(receipt, "key_id")
@@ -298,10 +330,10 @@ defmodule RequisitionReceiptVerifier.VerifyReceipt do
 
     check_window(occurred, valid_from, valid_to, key_id, entry, signed)
 
-    verified(key_id, entry, signed, log_checkpoint(receipt, checkpoint, key_id))
+    verified(key_id, entry, signed, log_checkpoint(receipt, checkpoint, key_id), at)
   end
 
-  defp verify(_receipt, _registry, _checkpoint), do: fail(@exit_usage, "the receipt must be a JSON object")
+  defp verify(_receipt, _registry, _checkpoint, _at), do: fail(@exit_usage, "the receipt must be a JSON object")
 
   defp log_checkpoint(_receipt, nil, _key_id), do: []
 
@@ -704,7 +736,7 @@ defmodule RequisitionReceiptVerifier.VerifyReceipt do
   defp decode64(value) when is_binary(value), do: Base.decode64(value)
   defp decode64(_value), do: :error
 
-  defp verified(key_id, entry, signed, checkpoint_lines) do
+  defp verified(key_id, entry, signed, checkpoint_lines, at) do
     IO.puts("""
     VERIFIED — signature is valid under key_id #{inspect(key_id)} (status: #{member(entry, "status")}).
 
@@ -715,8 +747,82 @@ defmodule RequisitionReceiptVerifier.VerifyReceipt do
     """)
 
     Enum.each(checkpoint_lines, &IO.puts/1)
+    if checkpoint_lines != [], do: IO.puts("")
+    Enum.each([@pass_line | window_lines(signed, at)], &IO.puts/1)
 
     System.halt(@exit_verified)
+  end
+
+  # WHAT A PASS SAYS: the kind of record a deadline is reported for, from the signed bytes (verify_receipt.py's
+  # window_kind). A signed verdict decides alone: a record that carries one is a decision, and it allowed only
+  # when the verdict is the text "allow". A record that carries none is a statement when its signed receipt_type
+  # is @window_statement_type and it carries exp, and is neither kind otherwise (a record of another kind that
+  # signs exp is no statement; a caller grant signs not_after, the day the grant ends, which is no deadline for an
+  # execution). A record of neither kind has no window.
+  defp window_kind(signed, metadata) do
+    cond do
+      Map.has_key?(metadata, "verdict") -> if metadata["verdict"] == "allow", do: @window_decision
+      member(signed, "receipt_type") != @window_statement_type -> nil
+      Map.has_key?(metadata, "exp") -> @window_statement
+      true -> nil
+    end
+  end
+
+  # WHAT A PASS SAYS: the lines about the record's window that follow @pass_line. `at` is nil or an accepted
+  # instant. The rule, in verify_receipt.py's words (its window_lines): the deadline is the first present
+  # member of the kind's end list, reported in the kind's sentence. A time given is compared with the signed
+  # values as text, which is chronological order for the one accepted form: the window is open from its start
+  # (the first present member of the kind's start list; a record that signs none has only its end compared)
+  # up to, and not at, its end. A member that is present and is not an instant of the accepted form is said so
+  # and is never compared.
+  defp window_lines(signed, at) do
+    metadata =
+      case member(signed, "metadata") do
+        object when is_map(object) -> object
+        _absent_or_not_an_object -> %{}
+      end
+
+    {sentence, end_names, start_names} = window_kind(signed, metadata) || {nil, [], []}
+    end_name = Enum.find(end_names, &Map.has_key?(metadata, &1))
+    start_name = Enum.find(start_names, &Map.has_key?(metadata, &1))
+
+    cond do
+      is_nil(end_name) and is_nil(at) ->
+        []
+
+      is_nil(end_name) ->
+        ["No time was compared: this record carries no execution window."]
+
+      is_nil(timestamp(metadata[end_name])) ->
+        [
+          "The signed #{end_name} is not a readable instant, so no deadline is reported.",
+          if(is_nil(at),
+            do: "No time was compared.",
+            else: "No time was compared: the signed #{end_name} is not a readable instant."
+          )
+        ]
+
+      true ->
+        ["#{sentence}#{metadata[end_name]}." | compared(metadata, start_name, metadata[end_name], at)]
+    end
+  end
+
+  defp compared(_metadata, _start_name, _finish, nil), do: ["No time was compared."]
+
+  defp compared(_metadata, nil, finish, at) when at < finish,
+    do: ["At #{at} the window was open (until #{finish}; the record signs no start, so none was compared)."]
+
+  defp compared(_metadata, nil, finish, at), do: ["At #{at} the window was closed (it ended at #{finish})."]
+
+  defp compared(metadata, start_name, finish, at) do
+    start = metadata[start_name]
+
+    cond do
+      is_nil(timestamp(start)) -> ["No time was compared: the signed #{start_name} is not a readable instant."]
+      at < start -> ["At #{at} the window was closed (it opened at #{start})."]
+      at >= finish -> ["At #{at} the window was closed (it ended at #{finish})."]
+      true -> ["At #{at} the window was open (from #{start}, until #{finish})."]
+    end
   end
 
   # A signature binds the receipt's position in its chain only when the signed bytes carry both
